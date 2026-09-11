@@ -444,9 +444,12 @@ public:
   /** \brief Obtain the Euclidean fitness score (e.g., mean of squared distances from
    * the source to the target) \param[in] max_range maximum allowable distance between a
    * point and its correspondence in the target (default: double::max)
+   * \param[in] use_indices whether to use the registered indices or all points
+   * (default: false)
    */
   inline double
-  getFitnessScore(double max_range = std::numeric_limits<double>::max());
+  getFitnessScore(double max_range = std::numeric_limits<double>::max(),
+                  bool use_indices = false);
 
   /** \brief Obtain the Euclidean fitness score (e.g., mean of squared distances from
    * the source to the target) from two sets of correspondence distances (distances
@@ -665,7 +668,7 @@ protected:
                      pcl::Indices& indices,
                      std::vector<float>& distances)
   {
-    int k = tree_->nearestKSearch(cloud, index, 1, indices, distances);
+    int k = tree_->nearestKSearchT(cloud[index], 1, indices, distances);
     if (k == 0)
       return (false);
     return (true);

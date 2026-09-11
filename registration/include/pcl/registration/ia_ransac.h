@@ -137,13 +137,10 @@ public:
 
   using ErrorFunctorPtr = typename ErrorFunctor::Ptr;
 
-  using FeatureKdTreePtr = typename KdTreeFLANN<FeatureT>::Ptr;
+  using FeatureKdTreePtr = typename pcl::search::Search<FeatureT>::Ptr;
   /** \brief Constructor. */
   SampleConsensusInitialAlignment()
-  : input_features_()
-  , target_features_()
-  , feature_tree_(new pcl::KdTreeFLANN<FeatureT>)
-  , error_functor_()
+  : input_features_(), target_features_(), error_functor_()
   {
     reg_name_ = "SampleConsensusInitialAlignment";
     max_iterations_ = 1000;
@@ -153,6 +150,7 @@ public:
     corr_dist_threshold_ = 100.0f;
     transformation_estimation_.reset(
         new pcl::registration::TransformationEstimationSVD<PointSource, PointTarget>);
+    setNumberOfThreads();
   };
 
   /** \brief Provide a shared pointer to the source point cloud's feature descriptors
@@ -232,6 +230,13 @@ public:
   {
     return (k_correspondences_);
   }
+
+  /** \brief Initialize the scheduler and set the number of threads to use.
+   * \param nr_threads the number of hardware threads to use (0 sets the value back to
+   * automatic)
+   */
+  void
+  setNumberOfThreads(unsigned int nr_threads = 0);
 
   /** \brief Specify the error function to minimize
    * \note This call is optional.  TruncatedError will be used by default
@@ -318,6 +323,9 @@ protected:
   /** \brief The number of neighbors to use when selecting a random feature
    * correspondence. */
   int k_correspondences_{10};
+
+  /** \brief The number of threads the scheduler should use. */
+  unsigned int threads_{1};
 
   /** \brief The KdTree used to compare feature descriptors. */
   FeatureKdTreePtr feature_tree_;

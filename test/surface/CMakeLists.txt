@@ -1,6 +1,7 @@
 set(SUBSYS_NAME tests_surface)
 set(SUBSYS_DESC "Point cloud library surface module unit tests")
 PCL_SET_TEST_DEPENDENCIES(SUBSYS_DEPS surface)
+list(APPEND SUBSYS_DEPS kdtree)
 set(OPT_DEPS io features sample_consensus filters) # module does not depend on these
 
 PCL_SUBSYS_OPTION(build "${SUBSYS_NAME}" "${SUBSYS_DESC}" ON)
@@ -38,6 +39,13 @@ PCL_ADD_TEST(surface_poisson test_poisson
              FILES test_poisson.cpp
              LINK_WITH pcl_gtest pcl_io pcl_kdtree pcl_surface pcl_features
              ARGUMENTS "${PCL_SOURCE_DIR}/test/bun0.pcd")
+
+if(BUILD_surface_on_nurbs)
+  PCL_ADD_TEST(surface_on_nurbs test_on_nurbs
+               FILES test_on_nurbs.cpp
+               LINK_WITH pcl_gtest pcl_io pcl_kdtree pcl_surface pcl_features pcl_search
+               ARGUMENTS "${PCL_SOURCE_DIR}/test/bun0.pcd")
+endif()
 
 if(QHULL_FOUND)
   PCL_ADD_TEST(surface_convex_hull test_convex_hull

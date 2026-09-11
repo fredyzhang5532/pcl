@@ -159,12 +159,11 @@ pcl::CPCSegmentation<PointT>::applyCuttingPlane (std::uint32_t depth_levels_left
       continue;
     }
 
-    Eigen::VectorXf model_coefficients;
-    weight_sac.getModelCoefficients (model_coefficients);
+    Eigen::VectorXf model_coefficients = weight_sac.getModelCoefficients ();
 
     model_coefficients[3] += std::numeric_limits<float>::epsilon ();    
 
-    weight_sac.getInliers (*support_indices);
+    *support_indices = weight_sac.getInliers ();
 
     // the support_indices which are actually cut (if not locally constrain:  cut_support_indices = support_indices
     pcl::Indices cut_support_indices;
@@ -177,12 +176,9 @@ pcl::CPCSegmentation<PointT>::applyCuttingPlane (std::uint32_t depth_levels_left
       // We also just actually cut when the edge goes through the plane. This is why we check the planedistance
       std::vector<pcl::PointIndices> cluster_indices;
       pcl::EuclideanClusterExtraction<WeightSACPointType> euclidean_clusterer;
-      pcl::search::KdTree<WeightSACPointType>::Ptr tree (new pcl::search::KdTree<WeightSACPointType>);
-      tree->setInputCloud (edge_cloud_cluster);
       euclidean_clusterer.setClusterTolerance (seed_resolution_);
       euclidean_clusterer.setMinClusterSize (1);
       euclidean_clusterer.setMaxClusterSize (25000);
-      euclidean_clusterer.setSearchMethod (tree);
       euclidean_clusterer.setInputCloud (edge_cloud_cluster);
       euclidean_clusterer.setIndices (support_indices);
       euclidean_clusterer.extract (cluster_indices);

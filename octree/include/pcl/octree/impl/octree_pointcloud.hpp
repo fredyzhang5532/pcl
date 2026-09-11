@@ -517,9 +517,9 @@ pcl::octree::OctreePointCloud<PointT, LeafContainerT, BranchContainerT, OctreeT>
 
         // octree not empty - we add another tree level and thus increase its size by a
         // factor of 2*2*2
-        child_idx = static_cast<unsigned char>(((bLowerBoundViolationX) << 2) |
-                                               ((bLowerBoundViolationY) << 1) |
-                                               ((bLowerBoundViolationZ)));
+        child_idx = static_cast<unsigned char>((bLowerBoundViolationX ? 4 : 0) |
+                                               (bLowerBoundViolationY ? 2 : 0) |
+                                               (bLowerBoundViolationZ ? 1 : 0));
 
         BranchNode* newRootBranch;
 
@@ -713,7 +713,7 @@ pcl::octree::OctreePointCloud<PointT, LeafContainerT, BranchContainerT, OctreeT>
 
   // tree depth == amount of bits of max_voxels
   this->octree_depth_ = std::max<uindex_t>(
-      std::min<uindex_t>(OctreeKey::maxDepth,
+      std::min<uindex_t>(OctreeKey::getMaxDepth(),
                          std::ceil(std::log2(max_voxels) - minValue)),
       0);
 

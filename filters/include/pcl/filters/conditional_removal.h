@@ -159,9 +159,11 @@ namespace pcl
       inline FieldComparison&
       operator = (const FieldComparison &src)
       {
+        if (this == &src)
+          return *this;
         compare_val_ = src.compare_val_;
         point_data_  = src.point_data_;
-        return (*this);
+        return *this;
       }
 
       /** \brief Destructor. */
@@ -401,8 +403,8 @@ namespace pcl
       inline void
       transformComparison (const Eigen::Matrix4f &transform)
       {
-        tf_comp_matr_ = transform.transpose () * comp_matr_ * transform;
-        tf_comp_vect_ = comp_vect_.transpose () * transform;
+        tf_comp_matr_.noalias() = transform.transpose () * comp_matr_ * transform;
+        tf_comp_vect_.noalias() = comp_vect_.transpose () * transform;
       }
 
       /** \brief transform the coordinate system of the comparison. If you think of

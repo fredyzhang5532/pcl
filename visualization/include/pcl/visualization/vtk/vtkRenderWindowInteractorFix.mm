@@ -35,7 +35,6 @@
   *
   */
 
-#import <Cocoa/Cocoa.h>
 #include <pcl/visualization/vtk/vtkRenderWindowInteractorFix.h>
 #include <vtkCocoaRenderWindow.h>
 #include <vtkCocoaRenderWindowInteractor.h>

@@ -43,7 +43,7 @@
 #include <pcl/console/print.h> // for PCL_ERROR
 #include <pcl/segmentation/region_growing_rgb.h>
 #include <pcl/search/search.h>
-#include <pcl/search/kdtree.h>
+#include <pcl/search/auto.h> // for pcl::search::autoSelectMethod
 
 #include <queue>
 
@@ -248,18 +248,22 @@ pcl::RegionGrowingRGB<PointT, NormalT>::prepareForSegmentation ()
   if (neighbour_number_ == 0)
     return (false);
 
-  // if user didn't set search method
-  if (!search_)
-    search_.reset (new pcl::search::KdTree<PointT>);
-
   if (indices_)
   {
     if (indices_->empty ())
       PCL_ERROR ("[pcl::RegionGrowingRGB::prepareForSegmentation] Empty given indices!\n");
-    search_->setInputCloud (input_, indices_);
+    if (!search_)
+      search_.reset (pcl::search::autoSelectMethod<PointT>(input_, indices_, true, pcl::search::Purpose::many_knn_search));
+    else
+      search_->setInputCloud (input_, indices_);
   }
   else
-    search_->setInputCloud (input_);
+  {
+    if (!search_)
+      search_.reset (pcl::search::autoSelectMethod<PointT>(input_, true, pcl::search::Purpose::many_knn_search));
+    else
+      search_->setInputCloud (input_);
+  }
 
   return (true);
 }
@@ -278,7 +282,7 @@ pcl::RegionGrowingRGB<PointT, NormalT>::findPointNeighbours ()
   {
     neighbours.clear ();
     distances.clear ();
-    search_->nearestKSearch (point_index, region_neighbour_number_, neighbours, distances);
+    search_->nearestKSearch ((*input_)[point_index], region_neighbour_number_, neighbours, distances);
     point_neighbours_[point_index].swap (neighbours);
     point_distances_[point_index].swap (distances);
   }
@@ -475,14 +479,14 @@ pcl::RegionGrowingRGB<PointT, NormalT>::applyRegionMergingAlgorithm ()
       num_seg_in_homogeneous_region[i_reg] = 0;
       final_segment_number -= 1;
 
-      for (auto& nghbr : region_neighbours[reg_index])
-      {
-        if ( segment_labels_[ nghbr.second ] == reg_index )
-        {
-          nghbr.first = std::numeric_limits<float>::max ();
-          nghbr.second = 0;
-        }
-      }
+      const auto filtered_region_neighbours_reg_index_end = std::remove_if (
+        region_neighbours[reg_index].begin (),
+        region_neighbours[reg_index].end (),
+        [this, reg_index] (const auto& nghbr) { return segment_labels_[ nghbr.second ] == reg_index; });
+      const auto filtered_region_neighbours_reg_index_size = std::distance (
+        region_neighbours[reg_index].begin (), filtered_region_neighbours_reg_index_end);
+      region_neighbours[reg_index].resize (filtered_region_neighbours_reg_index_size);
+
       for (const auto& nghbr : region_neighbours[i_reg])
       {
         if ( segment_labels_[ nghbr.second ] != reg_index )
@@ -491,7 +495,11 @@ pcl::RegionGrowingRGB<PointT, NormalT>::applyRegionMergingAlgorithm ()
         }
       }
       region_neighbours[i_reg].clear ();
-      std::sort (region_neighbours[reg_index].begin (), region_neighbours[reg_index].end (), comparePair);
+      std::inplace_merge (
+        region_neighbours[reg_index].begin (),
+        std::next (region_neighbours[reg_index].begin (), filtered_region_neighbours_reg_index_size),
+        region_neighbours[reg_index].end (),
+        comparePair);
     }
   }
 

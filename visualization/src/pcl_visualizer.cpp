@@ -126,6 +126,9 @@
 vtkIdType
 pcl::visualization::details::fillCells(std::vector<int>& lookup, const std::vector<pcl::Vertices>& vertices, vtkSmartPointer<vtkCellArray> cell_array, int max_size_of_polygon)
 {
+  const auto idx = vertices.size() + std::accumulate(vertices.begin(), vertices.end(), static_cast<vtkIdType>(0),
+    [](const auto& sum, const auto& vertex) { return sum + vertex.vertices.size(); });
+
 #ifdef VTK_CELL_ARRAY_V2
   pcl::utils::ignore(max_size_of_polygon);
 
@@ -172,10 +175,8 @@ pcl::visualization::details::fillCells(std::vector<int>& lookup, const std::vect
         *cell++ = vertj;
     }
   }
+  cell_array->GetData ()->SetNumberOfValues (idx);
 #endif
-
-  const auto idx = vertices.size() + std::accumulate(vertices.begin(), vertices.end(), static_cast<vtkIdType>(0),
-    [](const auto& sum, const auto& vertex) { return sum + vertex.vertices.size(); });
 
   return idx;
 }
@@ -668,7 +669,11 @@ pcl::visualization::PCLVisualizer::addCoordinateSystem (double scale, const std:
   axes->Update ();
 
   vtkSmartPointer<vtkFloatArray> axes_colors = vtkSmartPointer<vtkFloatArray>::New ();
+#if (VTK_MAJOR_VERSION > 9) || (VTK_MAJOR_VERSION == 9 && VTK_MINOR_VERSION >= 7)
+  axes_colors->ReserveValues (6);
+#else
   axes_colors->Allocate (6);
+#endif
   axes_colors->InsertNextValue (0.0);
   axes_colors->InsertNextValue (0.0);
   axes_colors->InsertNextValue (0.5);
@@ -709,7 +714,11 @@ pcl::visualization::PCLVisualizer::addCoordinateSystem (double scale, float x, f
   axes->Update ();
 
   vtkSmartPointer<vtkFloatArray> axes_colors = vtkSmartPointer<vtkFloatArray>::New ();
+#if (VTK_MAJOR_VERSION > 9) || (VTK_MAJOR_VERSION == 9 && VTK_MINOR_VERSION >= 7)
+  axes_colors->ReserveValues (6);
+#else
   axes_colors->Allocate (6);
+#endif
   axes_colors->InsertNextValue (0.0);
   axes_colors->InsertNextValue (0.0);
   axes_colors->InsertNextValue (0.5);
@@ -781,7 +790,11 @@ pcl::visualization::PCLVisualizer::addCoordinateSystem (double scale, const Eige
   axes->Update ();
 
   vtkSmartPointer<vtkFloatArray> axes_colors = vtkSmartPointer<vtkFloatArray>::New ();
+#if (VTK_MAJOR_VERSION > 9) || (VTK_MAJOR_VERSION == 9 && VTK_MINOR_VERSION >= 7)
+  axes_colors->ReserveValues (6);
+#else
   axes_colors->Allocate (6);
+#endif
   axes_colors->InsertNextValue (0.0);
   axes_colors->InsertNextValue (0.0);
   axes_colors->InsertNextValue (0.5);
@@ -1278,7 +1291,9 @@ pcl::visualization::PCLVisualizer::convertPointCloudToVTKPolyData (
   vtkIdType nr_points = points->GetNumberOfPoints ();
 
   // Create the supporting structures
-  vertices = polydata->GetVerts ();
+#ifndef VTK_CELL_ARRAY_V2
+  vertices = polydata->GetVerts (); // Using the return value of GetVerts() in SetVerts() does not guarantee consistent internal data in polydata
+#endif
   if (!vertices)
     vertices = vtkSmartPointer<vtkCellArray>::New ();
 
@@ -1400,7 +1415,7 @@ pcl::visualization::PCLVisualizer::setPointCloudRenderingProperties (
       // Check if the mapper has scalars
       if (!actor->GetMapper ()->GetInput ()->GetPointData ()->GetScalars ())
         break;
-      
+
       // Check that scalars are not unisgned char (i.e. check if a LUT is used to colormap scalars assuming vtk ColorMode is Default)
       if (actor->GetMapper ()->GetInput ()->GetPointData ()->GetScalars ()->IsA ("vtkUnsignedCharArray"))
         break;
@@ -1411,7 +1426,7 @@ pcl::visualization::PCLVisualizer::setPointCloudRenderingProperties (
         PCL_WARN ("[setPointCloudRenderingProperties] Range max must be greater than range min!\n");
         return (false);
       }
-      
+
       // Update LUT
       actor->GetMapper ()->GetLookupTable ()->SetRange (val1, val2);
       actor->GetMapper()->UseLookupTableScalarRangeOn ();
@@ -1563,7 +1578,7 @@ pcl::visualization::PCLVisualizer::setPointCloudRenderingProperties (
       // Check if the mapper has scalars
       if (!actor->GetMapper ()->GetInput ()->GetPointData ()->GetScalars ())
         break;
-      
+
       // Check that scalars are not unisgned char (i.e. check if a LUT is used to colormap scalars assuming vtk ColorMode is Default)
       if (actor->GetMapper ()->GetInput ()->GetPointData ()->GetScalars ()->IsA ("vtkUnsignedCharArray"))
         break;
@@ -1571,7 +1586,7 @@ pcl::visualization::PCLVisualizer::setPointCloudRenderingProperties (
       // Get range limits from existing LUT
       double *range;
       range = actor->GetMapper ()->GetLookupTable ()->GetRange ();
-      
+
       actor->GetMapper ()->ScalarVisibilityOn ();
       actor->GetMapper ()->SetScalarRange (range[0], range[1]);
       vtkSmartPointer<vtkLookupTable> table;
@@ -1587,7 +1602,7 @@ pcl::visualization::PCLVisualizer::setPointCloudRenderingProperties (
       // Check if the mapper has scalars
       if (!actor->GetMapper ()->GetInput ()->GetPointData ()->GetScalars ())
         break;
-      
+
       // Check that scalars are not unisgned char (i.e. check if a LUT is used to colormap scalars assuming vtk ColorMode is Default)
       if (actor->GetMapper ()->GetInput ()->GetPointData ()->GetScalars ()->IsA ("vtkUnsignedCharArray"))
         break;
@@ -1717,7 +1732,7 @@ pcl::visualization::PCLVisualizer::setShapeRenderingProperties (
       // Check if the mapper has scalars
       if (!actor->GetMapper ()->GetInput ()->GetPointData ()->GetScalars ())
         break;
-      
+
       // Check that scalars are not unisgned char (i.e. check if a LUT is used to colormap scalars assuming vtk ColorMode is Default)
       if (actor->GetMapper ()->GetInput ()->GetPointData ()->GetScalars ()->IsA ("vtkUnsignedCharArray"))
         break;
@@ -1728,7 +1743,7 @@ pcl::visualization::PCLVisualizer::setShapeRenderingProperties (
         PCL_WARN ("[setShapeRenderingProperties] Range max must be greater than range min!\n");
         return (false);
       }
-      
+
       // Update LUT
       actor->GetMapper ()->GetLookupTable ()->SetRange (val1, val2);
       actor->GetMapper()->UseLookupTableScalarRangeOn ();
@@ -1861,11 +1876,11 @@ pcl::visualization::PCLVisualizer::setShapeRenderingProperties (
       // Check that scalars are not unisgned char (i.e. check if a LUT is used to colormap scalars assuming vtk ColorMode is Default)
       if (actor->GetMapper ()->GetInput ()->GetPointData ()->GetScalars ()->IsA ("vtkUnsignedCharArray"))
         break;
-      
+
       // Get range limits from existing LUT
       double *range;
       range = actor->GetMapper ()->GetLookupTable ()->GetRange ();
-      
+
       actor->GetMapper ()->ScalarVisibilityOn ();
       actor->GetMapper ()->SetScalarRange (range[0], range[1]);
       vtkSmartPointer<vtkLookupTable> table;
@@ -2179,7 +2194,7 @@ void
 pcl::visualization::PCLVisualizer::resetCameraViewpoint (const std::string &id)
 {
   vtkSmartPointer<vtkMatrix4x4> camera_pose;
-  const CloudActorMap::iterator it = cloud_actor_map_->find(id);
+  const auto it = cloud_actor_map_->find(id);
   if (it != cloud_actor_map_->end ())
     camera_pose = it->second.viewpoint_transformation_;
   else
@@ -3005,7 +3020,7 @@ pcl::visualization::PCLVisualizer::addPolygonMesh (const pcl::PolygonMesh &poly_
   pcl::fromPCLPointCloud2 (poly_mesh.cloud, *point_cloud);
   poly_points->SetNumberOfPoints (point_cloud->size ());
 
-  for (std::size_t i = 0; i < point_cloud->size (); ++i) 
+  for (std::size_t i = 0; i < point_cloud->size (); ++i)
   {
     const pcl::PointXYZ& p = (*point_cloud)[i];
     poly_points->InsertPoint (i, p.x, p.y, p.z);
@@ -3175,10 +3190,9 @@ pcl::visualization::PCLVisualizer::updatePolygonMesh (
 
   // Update the cells
   cells = vtkSmartPointer<vtkCellArray>::New ();
-  
-  const auto idx = details::fillCells(lookup, verts, cells, max_size_of_polygon);
 
-  cells->GetData ()->SetNumberOfValues (idx);
+  details::fillCells(lookup, verts, cells, max_size_of_polygon);
+
   cells->Squeeze ();
   // Set the the vertices
   polydata->SetStrips (cells);
@@ -3419,7 +3433,7 @@ pcl::visualization::PCLVisualizer::addTextureMesh (const pcl::TextureMesh &mesh,
     mapper->MapDataArrayToMultiTextureAttribute(tu,
       this_coordinates_name.c_str(),
       vtkDataObject::FIELD_ASSOCIATION_POINTS);
-    
+
     polydata->GetPointData ()->AddArray (coordinates);
     actor->GetProperty ()->SetTexture (tu, texture);
     ++tex_id;
@@ -4073,7 +4087,12 @@ pcl::visualization::PCLVisualizer::fromHandlersToScreen (
   // Save the pointer/ID pair to the global actor map
   CloudActor& cloud_actor = (*cloud_actor_map_)[id];
   cloud_actor.actor = actor;
+#if VTK_MAJOR_VERSION > 9 || (VTK_MAJOR_VERSION == 9 && VTK_MINOR_VERSION >= 6)
+  cloud_actor.cells = vtkSmartPointer<vtkIdTypeArray>::New ();
+  reinterpret_cast<vtkPolyDataMapper*>(actor->GetMapper ())->GetInput ()->GetVerts ()->ExportLegacyFormat (cloud_actor.cells);
+#else
   cloud_actor.cells = reinterpret_cast<vtkPolyDataMapper*>(actor->GetMapper ())->GetInput ()->GetVerts ()->GetData ();
+#endif
   cloud_actor.geometry_handlers.push_back (geometry_handler);
   cloud_actor.color_handlers.push_back (color_handler);
 
@@ -4338,7 +4357,7 @@ pcl::visualization::PCLVisualizer::close ()
 void
 pcl::visualization::PCLVisualizer::removeCorrespondences (
     const std::string &id, int viewport)
-{ 
+{
   removeShape (id, viewport);
 }
 
@@ -4358,7 +4377,7 @@ int
 pcl::visualization::PCLVisualizer::getGeometryHandlerIndex (const std::string &id)
 {
   auto am_it = style_->getCloudActorMap ()->find (id);
-  if (am_it != cloud_actor_map_->end ())
+  if (am_it == cloud_actor_map_->end ())
     return (-1);
 
   return (am_it->second.geometry_handler_index_);
@@ -4571,7 +4590,7 @@ pcl::visualization::PCLVisualizer::getUniqueCameraFile (int argc, char **argv)
   p_file_indices = pcl::console::parse_file_extension_argument (argc, argv, ".pcd");
   if (!p_file_indices.empty ())
   {
-    boost::uuids::detail::sha1 sha1;    
+    boost::uuids::detail::sha1 sha1;
     bool valid = false;
 
     // Calculate sha1 using canonical paths
@@ -4593,7 +4612,7 @@ pcl::visualization::PCLVisualizer::getUniqueCameraFile (int argc, char **argv)
       boost::uuids::detail::sha1::digest_type digest;
       sha1.get_digest (digest);
       sstream << ".";
-      for (int i = 0; i < 5; ++i) {
+      for (int i = 0; i < static_cast<int>(sizeof(digest)/sizeof(unsigned int)); ++i) {
         sstream << std::hex << *(reinterpret_cast<unsigned int*>(&digest[0]) + i);
       }
       sstream << ".cam";

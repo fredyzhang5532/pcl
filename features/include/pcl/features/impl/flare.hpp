@@ -41,6 +41,7 @@
 
 #include <pcl/features/flare.h>
 #include <pcl/common/geometry.h>
+#include <pcl/search/auto.h> // for autoSelectMethod
 
 //////////////////////////////////////////////////////////////////////////////////////////////
 template<typename PointInT, typename PointNT, typename PointOutT, typename SignedDistanceT> bool
@@ -74,10 +75,7 @@ template<typename PointInT, typename PointNT, typename PointOutT, typename Signe
   // Check if a space search locator was given for sampled_surface_
   if (!sampled_tree_)
   {
-    if (sampled_surface_->isOrganized () && surface_->isOrganized () && input_->isOrganized ())
-      sampled_tree_.reset (new pcl::search::OrganizedNeighbor<PointInT> ());
-    else
-      sampled_tree_.reset (new pcl::search::KdTree<PointInT> (false));
+    sampled_tree_.reset (pcl::search::autoSelectMethod<PointInT>(sampled_surface_, false, pcl::search::Purpose::radius_search));
   }
 
   if (sampled_tree_->getInputCloud () != sampled_surface_) // Make sure the tree searches the sampled surface
@@ -175,8 +173,6 @@ template<typename PointInT, typename PointNT, typename PointOutT, typename Signe
   SignedDistanceT shape_score;
   SignedDistanceT best_shape_score = -std::numeric_limits<SignedDistanceT>::max ();
   int best_shape_index = -1;
-
-  Eigen::Vector3f best_margin_point;
 
   const float radius2 = tangent_radius_ * tangent_radius_;
   const float margin_distance2 = margin_thresh_ * margin_thresh_ * radius2;

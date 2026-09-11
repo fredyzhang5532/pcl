@@ -40,7 +40,8 @@
 #pragma once
 
 #include <pcl/filters/filter_indices.h>
-#include <pcl/search/search.h> // for Search
+#include <pcl/point_types.h>             // for pcl::PointXYZ
+#include <pcl/search/search.h>           // for Search
 
 namespace pcl
 {
@@ -73,6 +74,7 @@ namespace pcl
     * indices_rem = sorfilter.getRemovedIndices ();
     * // The indices_rem array indexes all points of cloud_in that are outliers
     * \endcode
+    * \sa RadiusOutlierRemoval
     * \author Radu Bogdan Rusu
     * \ingroup filters
     */
@@ -135,7 +137,7 @@ namespace pcl
         * Points will be classified as inlier or outlier if their average neighbor distance is below or above this threshold respectively.
         */
       inline double
-      getStddevMulThresh ()
+      getStddevMulThresh () const
       {
         return (std_mul_);
       }
@@ -179,7 +181,7 @@ namespace pcl
       /** \brief The number of points to use for mean distance estimation. */
       int mean_k_{1};
 
-      /** \brief Standard deviations threshold (i.e., points outside of 
+      /** \brief Standard deviations threshold (i.e., points outside of
         * \f$ \mu \pm \sigma \cdot std\_mul \f$ will be marked as outliers). */
       double std_mul_{0.0};
   };
@@ -228,7 +230,7 @@ namespace pcl
 
       /** \brief Get the number of points to use for mean distance estimation. */
       inline int
-      getMeanK ()
+      getMeanK () const
       {
         return (mean_k_);
       }
@@ -247,7 +249,7 @@ namespace pcl
 
       /** \brief Get the standard deviation multiplier threshold as set by the user. */
       inline double
-      getStddevMulThresh ()
+      getStddevMulThresh () const
       {
         return (std_mul_);
       }
@@ -256,8 +258,8 @@ namespace pcl
       /** \brief The number of points to use for mean distance estimation. */
       int mean_k_{2};
 
-      /** \brief Standard deviations threshold (i.e., points outside of 
-        * \f$ \mu \pm \sigma \cdot std\_mul \f$ will be marked as outliers). 
+      /** \brief Standard deviations threshold (i.e., points outside of
+        * \f$ \mu \pm \sigma \cdot std\_mul \f$ will be marked as outliers).
         */
       double std_mul_{0.0};
 

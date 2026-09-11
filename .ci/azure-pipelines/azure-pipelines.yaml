@@ -27,6 +27,9 @@ resources:
     - container: env2404
       image: pointcloudlibrary/env:24.04
 
+variables:
+  isMain: $[eq(variables['Build.SourceBranch'], 'refs/heads/master')]
+
 stages:
   - stage: formatting
     displayName: Formatting
@@ -40,21 +43,21 @@ stages:
       - job: ubuntu
         displayName: Ubuntu
         pool:
-          vmImage: 'ubuntu-22.04'
+          vmImage: 'ubuntu-24.04'
         strategy:
           matrix:
             20.04 GCC:  # oldest LTS
               CONTAINER: env2004
               CC: gcc
               CXX: g++
-              BUILD_GPU: ON
-              CMAKE_ARGS: '-DPCL_WARNINGS_ARE_ERRORS=ON'
+              BUILD_GPU: OFF
+              CMAKE_ARGS: '-DWITH_CUDA=OFF -DPCL_WARNINGS_ARE_ERRORS=ON'
             24.04 GCC:  # latest Ubuntu
               CONTAINER: env2404
               CC: gcc
               CXX: g++
               BUILD_GPU: ON
-              CMAKE_ARGS: '-DCMAKE_CXX_STANDARD=17 -DCMAKE_CUDA_STANDARD=17'
+              CMAKE_ARGS: ''
         container: $[ variables['CONTAINER'] ]
         timeoutInMinutes: 0
         variables:
@@ -74,12 +77,12 @@ stages:
           vmImage: '$(VMIMAGE)'
         strategy:
           matrix:
-            Monterey 12:
-              VMIMAGE: 'macOS-12'
-              OSX_VERSION: '12'
-            Ventura 13:
-              VMIMAGE: 'macOS-13'
-              OSX_VERSION: '13'
+            Sonoma 14:
+              VMIMAGE: 'macOS-14'
+              OSX_VERSION: '14'
+            Sequoia 15:
+              VMIMAGE: 'macOS-15'
+              OSX_VERSION: '15'
         timeoutInMinutes: 0
         variables:
           BUILD_DIR: '$(Agent.WorkFolder)/build'
@@ -96,7 +99,7 @@ stages:
         dependsOn: osx
         condition: succeededOrFailed()
         pool:
-          vmImage: 'ubuntu-22.04'
+          vmImage: 'ubuntu-24.04'
         strategy:
           matrix:
             22.04 Clang:
@@ -119,7 +122,7 @@ stages:
         dependsOn: osx
         condition: succeededOrFailed()
         pool:
-          vmImage: 'ubuntu-22.04'
+          vmImage: 'ubuntu-24.04'
         strategy:
           matrix:
             22.04 Clang:
@@ -156,7 +159,7 @@ stages:
               CONTAINER: winx64
               PLATFORM: 'x64'
               ARCHITECTURE: 'x86_amd64'
-              GENERATOR: '"Visual Studio 16 2019" -A x64'
+              GENERATOR: '"Visual Studio 17 2022" -A x64'
         container: $[ variables['CONTAINER'] ]
         timeoutInMinutes: 0
         variables:

@@ -37,6 +37,7 @@
  */
 #include <pcl/io/obj_io.h>
 #include <fstream>
+#include <exception>
 #include <pcl/common/io.h>
 #include <pcl/common/pcl_filesystem.h>
 #include <pcl/console/time.h>
@@ -550,6 +551,7 @@ pcl::OBJReader::read (const std::string &file_name, pcl::PCLPointCloud2 &cloud,
 
   //vector[idx of vertex]<accumulated normals{x, y, z}>
   std::vector<Eigen::Vector3f> normal_mapping;
+  bool normal_mapping_used = false;
 
   // std::size_t rgba_field = 0;
   for (std::size_t i = 0; i < cloud.fields.size (); ++i)
@@ -653,6 +655,12 @@ pcl::OBJReader::read (const std::string &file_name, pcl::PCLPointCloud2 &cloud,
 
           int v = std::stoi(f_st[0]);
           v = (v < 0) ? point_idx + v : v - 1;
+          if (v < 0 || static_cast<std::size_t> (v) >= cloud.width)
+          {
+            PCL_ERROR ("[pcl::OBJReader::read] Vertex index out of bounds in line %s\n", line.c_str ());
+            fs.close ();
+            return (-1);
+          }
           face_vertices.vertices[i - 1] = v;
 
           //handle normals
@@ -660,8 +668,14 @@ pcl::OBJReader::read (const std::string &file_name, pcl::PCLPointCloud2 &cloud,
           {
             int n = std::stoi(n_st);
             n = (n < 0) ? normal_idx + n : n - 1;
-
+            if (normal_mapping.empty() || n < 0 || static_cast<std::size_t> (n) >= normals.size())
+            {
+              PCL_ERROR ("[pcl::OBJReader::read] Normal index out of bounds in line %s\n", line.c_str ());
+              fs.close ();
+              return (-1);
+            }
             normal_mapping[v] += normals[n];
+            normal_mapping_used = true;
           }
         }
         continue;
@@ -674,8 +688,14 @@ pcl::OBJReader::read (const std::string &file_name, pcl::PCLPointCloud2 &cloud,
     fs.close ();
     return (-1);
   }
+  catch (const std::exception &exception)
+  {
+    PCL_ERROR ("[pcl::OBJReader::read] %s\n", exception.what ());
+    fs.close ();
+    return (-1);
+  }
 
-  if (!normal_mapping.empty())
+  if (normal_mapping_used && !normal_mapping.empty())
   {
     for (uindex_t i = 0, main_offset = 0; i < cloud.width; ++i, main_offset += cloud.point_step)
     {
@@ -683,6 +703,16 @@ pcl::OBJReader::read (const std::string &file_name, pcl::PCLPointCloud2 &cloud,
 
       for (int j = 0, f = normal_x_field; j < 3; ++j, ++f)
         memcpy(&cloud.data[main_offset + cloud.fields[f].offset], &normal_mapping[i][j], sizeof(float));
+    }
+  }
+  else if (cloud.width == normals.size())
+  {
+    // if obj file contains vertex normals (same number as vertices), but does not define faces,
+    // then associate vertices and vertex normals one-to-one
+    for (uindex_t i = 0, main_offset = 0; i < cloud.width; ++i, main_offset += cloud.point_step)
+    {
+      for (int j = 0, f = normal_x_field; j < 3; ++j, ++f)
+        memcpy(&cloud.data[main_offset + cloud.fields[f].offset], &normals[i][j], sizeof(float));
     }
   }
 
@@ -887,6 +917,12 @@ pcl::OBJReader::read (const std::string &file_name, pcl::TextureMesh &mesh,
 
           int v = std::stoi(f_st[0]);
           v = (v < 0) ? v_idx + v : v - 1;
+          if (v < 0 || static_cast<std::size_t> (v) >= mesh.cloud.width)
+          {
+            PCL_ERROR ("[pcl::OBJReader::read] Vertex index out of bounds in line %s\n", line.c_str ());
+            fs.close ();
+            return (-1);
+          }
           face_vertices.vertices[i - 1] = v;
 
           //handle normals
@@ -894,7 +930,12 @@ pcl::OBJReader::read (const std::string &file_name, pcl::TextureMesh &mesh,
           {
             int n = std::stoi(n_st);
             n = (n < 0) ? vn_idx + n : n - 1;
-
+            if (normal_mapping.empty() || n < 0 || static_cast<std::size_t> (n) >= normals.size())
+            {
+              PCL_ERROR ("[pcl::OBJReader::read] Normal index out of bounds in line %s\n", line.c_str ());
+              fs.close ();
+              return (-1);
+            }
             normal_mapping[v] += normals[n];
           }
 
@@ -902,7 +943,12 @@ pcl::OBJReader::read (const std::string &file_name, pcl::TextureMesh &mesh,
           {
             int vt = std::stoi(vt_st);
             vt = (vt < 0) ? vt_idx + vt : vt - 1;
-
+            if (vt < 0 || static_cast<std::size_t> (vt) >= vt_idx)
+            {
+              PCL_ERROR ("[pcl::OBJReader::read] Texture coordinate index out of bounds in line %s\n", line.c_str ());
+              fs.close ();
+              return (-1);
+            }
             tex_indices.vertices.push_back(vt);
           }
         }
@@ -916,6 +962,12 @@ pcl::OBJReader::read (const std::string &file_name, pcl::TextureMesh &mesh,
   catch (const char *exception)
   {
     PCL_ERROR ("[pcl::OBJReader::read] %s\n", exception);
+    fs.close ();
+    return (-1);
+  }
+  catch (const std::exception &exception)
+  {
+    PCL_ERROR ("[pcl::OBJReader::read] %s\n", exception.what ());
     fs.close ();
     return (-1);
   }
@@ -983,6 +1035,7 @@ pcl::OBJReader::read (const std::string &file_name, pcl::PolygonMesh &mesh,
 
   //vector[idx of vertex]<accumulated normals{x, y, z}>
   std::vector<Eigen::Vector3f> normal_mapping;
+  bool normal_mapping_used = false;
 
   // std::size_t rgba_field = 0;
   for (std::size_t i = 0; i < mesh.cloud.fields.size (); ++i)
@@ -1084,6 +1137,12 @@ pcl::OBJReader::read (const std::string &file_name, pcl::PolygonMesh &mesh,
 
           int v = std::stoi(f_st[0]);
           v = (v < 0) ? v_idx + v : v - 1;
+          if (v < 0 || static_cast<std::size_t> (v) >= mesh.cloud.width)
+          {
+            PCL_ERROR ("[pcl::OBJReader::read] Vertex index out of bounds in line %s\n", line.c_str ());
+            fs.close ();
+            return (-1);
+          }
           face_vertices.vertices[i - 1] = v;
 
           //handle normals
@@ -1091,8 +1150,14 @@ pcl::OBJReader::read (const std::string &file_name, pcl::PolygonMesh &mesh,
           {
             int n = std::stoi(n_st);
             n = (n < 0) ? vn_idx + n : n - 1;
-              
+            if (normal_mapping.empty() || n < 0 || static_cast<std::size_t> (n) >= normals.size())
+            {
+              PCL_ERROR ("[pcl::OBJReader::read] Normal index out of bounds in line %s\n", line.c_str ());
+              fs.close ();
+              return (-1);
+            }
             normal_mapping[v] += normals[n];
+            normal_mapping_used = true;
           }
         }
         mesh.polygons.push_back (face_vertices);
@@ -1106,8 +1171,14 @@ pcl::OBJReader::read (const std::string &file_name, pcl::PolygonMesh &mesh,
     fs.close ();
     return (-1);
   }
+  catch (const std::exception &exception)
+  {
+    PCL_ERROR ("[pcl::OBJReader::read] %s\n", exception.what ());
+    fs.close ();
+    return (-1);
+  }
 
-  if (!normal_mapping.empty())
+  if (normal_mapping_used && !normal_mapping.empty())
   {
     for (uindex_t i = 0, main_offset = 0; i < mesh.cloud.width; ++i, main_offset += mesh.cloud.point_step)
     {
@@ -1115,6 +1186,16 @@ pcl::OBJReader::read (const std::string &file_name, pcl::PolygonMesh &mesh,
 
       for (int j = 0, f = normal_x_field; j < 3; ++j, ++f)
         memcpy(&mesh.cloud.data[main_offset + mesh.cloud.fields[f].offset], &normal_mapping[i][j], sizeof(float));
+    }
+  }
+  else if (mesh.cloud.width == normals.size())
+  {
+    // if obj file contains vertex normals (same number as vertices), but does not define faces,
+    // then associate vertices and vertex normals one-to-one
+    for (uindex_t i = 0, main_offset = 0; i < mesh.cloud.width; ++i, main_offset += mesh.cloud.point_step)
+    {
+      for (int j = 0, f = normal_x_field; j < 3; ++j, ++f)
+        memcpy(&mesh.cloud.data[main_offset + mesh.cloud.fields[f].offset], &normals[i][j], sizeof(float));
     }
   }
 

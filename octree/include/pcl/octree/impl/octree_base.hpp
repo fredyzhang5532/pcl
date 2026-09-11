@@ -39,6 +39,9 @@
 #ifndef PCL_OCTREE_BASE_HPP
 #define PCL_OCTREE_BASE_HPP
 
+#include <pcl/octree/octree_base.h>
+#include <pcl/octree/octree_key.h>
+
 #include <vector>
 
 namespace pcl {
@@ -75,7 +78,7 @@ OctreeBase<LeafContainerT, BranchContainerT>::setMaxVoxelIndex(
 
   // tree depth == bitlength of maxVoxels
   tree_depth =
-      std::min(static_cast<uindex_t>(OctreeKey::maxDepth),
+      std::min(static_cast<uindex_t>(OctreeKey::getMaxDepth()),
                static_cast<uindex_t>(std::ceil(std::log2(max_voxel_index_arg))));
 
   setTreeDepth(tree_depth);
@@ -91,11 +94,11 @@ OctreeBase<LeafContainerT, BranchContainerT>::setTreeDepth(uindex_t depth_arg)
               depth_arg);
     return;
   }
-  if (depth_arg > OctreeKey::maxDepth) {
+  if (depth_arg > OctreeKey::getMaxDepth()) {
     PCL_ERROR("[pcl::octree::OctreeBase::setTreeDepth] Tree depth (%lu) must be <= max "
               "depth(%lu)!\n",
               depth_arg,
-              OctreeKey::maxDepth);
+              OctreeKey::getMaxDepth());
     return;
   }
 
@@ -244,8 +247,8 @@ OctreeBase<LeafContainerT, BranchContainerT>::deserializeTree(
   deleteTree();
 
   // iterator for binary tree structure vector
-  std::vector<char>::const_iterator binary_tree_out_it = binary_tree_out_arg.begin();
-  std::vector<char>::const_iterator binary_tree_out_it_end = binary_tree_out_arg.end();
+  auto binary_tree_out_it = binary_tree_out_arg.cbegin();
+  auto binary_tree_out_it_end = binary_tree_out_arg.cend();
 
   deserializeTreeRecursive(root_node_,
                            depth_mask_,
@@ -266,19 +269,17 @@ OctreeBase<LeafContainerT, BranchContainerT>::deserializeTree(
   OctreeKey new_key;
 
   // set data iterator to first element
-  typename std::vector<LeafContainerT*>::const_iterator leaf_vector_it =
-      leaf_container_vector_arg.begin();
+  auto leaf_vector_it = leaf_container_vector_arg.cbegin();
 
   // set data iterator to last element
-  typename std::vector<LeafContainerT*>::const_iterator leaf_vector_it_end =
-      leaf_container_vector_arg.end();
+  auto leaf_vector_it_end = leaf_container_vector_arg.cend();
 
   // free existing tree before tree rebuild
   deleteTree();
 
   // iterator for binary tree structure vector
-  std::vector<char>::const_iterator binary_tree_input_it = binary_tree_in_arg.begin();
-  std::vector<char>::const_iterator binary_tree_input_it_end = binary_tree_in_arg.end();
+  auto binary_tree_input_it = binary_tree_in_arg.cbegin();
+  auto binary_tree_input_it_end = binary_tree_in_arg.cend();
 
   deserializeTreeRecursive(root_node_,
                            depth_mask_,

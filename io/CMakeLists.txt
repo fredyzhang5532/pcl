@@ -5,9 +5,9 @@ set(SUBSYS_EXT_DEPS boost eigen3)
 
 PCL_SUBSYS_OPTION(build "${SUBSYS_NAME}" "${SUBSYS_DESC}" ON)
 if(WIN32)
-  PCL_SUBSYS_DEPEND(build NAME ${SUBSYS_NAME} DEPS ${SUBSYS_DEPS} OPT_DEPS openni openni2 ensenso davidSDK dssdk rssdk rssdk2 pcap png vtk OpenMP EXT_DEPS ${SUBSYS_EXT_DEPS})
+  PCL_SUBSYS_DEPEND(build NAME ${SUBSYS_NAME} DEPS ${SUBSYS_DEPS} OPT_DEPS openni openni2 ensenso davidSDK dssdk rssdk rssdk2 pcap png vtk OpenMP ZLIB EXT_DEPS ${SUBSYS_EXT_DEPS})
 else()
-  PCL_SUBSYS_DEPEND(build NAME ${SUBSYS_NAME} DEPS ${SUBSYS_DEPS} OPT_DEPS openni openni2 ensenso davidSDK dssdk pcap png vtk libusb OpenMP EXT_DEPS ${SUBSYS_EXT_DEPS})
+  PCL_SUBSYS_DEPEND(build NAME ${SUBSYS_NAME} DEPS ${SUBSYS_DEPS} OPT_DEPS openni openni2 ensenso davidSDK dssdk pcap png vtk libusb OpenMP ZLIB EXT_DEPS ${SUBSYS_EXT_DEPS})
 endif()
 
 PCL_ADD_DOC("${SUBSYS_NAME}")
@@ -211,6 +211,8 @@ endif()
 PCL_ADD_INCLUDES("${SUBSYS_NAME}" "${SUBSYS_NAME}/ply" ${PLY_INCLUDES})
 target_link_libraries(pcl_io_ply pcl_common Boost::boost)
 
+PCL_MAKE_PKGCONFIG(pcl_io_ply COMPONENT ${SUBSYS_NAME} DESC "${SUBSYS_DESC}, PLY" PCL_DEPS common)
+
 set(srcs
   src/debayer.cpp
   src/pcd_grabber.cpp
@@ -242,7 +244,7 @@ set(srcs
   ${RSSDK2_GRABBER_SOURCES}
 )
 
-if(PNG_FOUND)
+if(PNG_FOUND AND ZLIB_FOUND)
   list(APPEND srcs
     src/libpng_wrapper.cpp
   )
@@ -336,7 +338,7 @@ add_definitions(${VTK_DEFINES})
 
 PCL_ADD_LIBRARY(${LIB_NAME} COMPONENT ${SUBSYS_NAME} SOURCES ${srcs} ${incs} ${compression_incs} ${impl_incs} ${OPENNI_INCLUDES} ${OPENNI2_INCLUDES})
 
-target_link_libraries("${LIB_NAME}" Boost::boost Boost::iostreams pcl_common pcl_io_ply)
+target_link_libraries("${LIB_NAME}" Boost::boost Boost::iostreams pcl_common pcl_io_ply pcl_octree)
 if(TARGET Boost::filesystem)
   target_link_libraries("${LIB_NAME}" Boost::filesystem)
 endif()
@@ -369,6 +371,10 @@ endif()
 if(PNG_FOUND)
   target_include_directories("${LIB_NAME}" SYSTEM PRIVATE ${PNG_INCLUDE_DIRS})
   target_link_libraries("${LIB_NAME}" ${PNG_LIBRARIES})
+endif()
+
+if(PNG_FOUND AND ZLIB_FOUND)
+  target_link_libraries("${LIB_NAME}" ZLIB::ZLIB)
 endif()
 
 if(LIBUSB_FOUND)
@@ -428,6 +434,7 @@ endif()
 if(WITH_ENSENSO)
   list(APPEND EXT_DEPS ensenso)
 endif()
+list(APPEND EXT_DEPS pcl_io_ply)
 
 PCL_MAKE_PKGCONFIG(${LIB_NAME} COMPONENT ${SUBSYS_NAME} DESC ${SUBSYS_DESC} PCL_DEPS ${SUBSYS_DEPS} EXT_DEPS ${EXT_DEPS})
 

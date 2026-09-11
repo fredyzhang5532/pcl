@@ -170,7 +170,7 @@ void
 pcl::visualization::PCLHistogramVisualizer::reCreateActor (
     const vtkSmartPointer<vtkDoubleArray> &xy_array, RenWinInteract* renwinupd, const int hsize)
 {
-  renwinupd->ren_->RemoveActor2D (renwinupd->xy_plot_);
+  renwinupd->ren_->RemoveViewProp (renwinupd->xy_plot_);
   renwinupd->xy_plot_->RemoveAllDataSetInputConnections ();
   
   double min_max[2];
@@ -184,7 +184,7 @@ pcl::visualization::PCLHistogramVisualizer::reCreateActor (
   field_data->SetFieldData (field_values);
 
   renwinupd->xy_plot_->AddDataObjectInput (field_data);
-  renwinupd->ren_->AddActor2D (renwinupd->xy_plot_);
+  renwinupd->ren_->AddViewProp (renwinupd->xy_plot_);
   
   renwinupd->xy_plot_->SetYTitle (""); renwinupd->xy_plot_->SetXTitle ("");
   renwinupd->xy_plot_->SetYRange (min_max[0], min_max[1]); 
@@ -248,7 +248,7 @@ pcl::visualization::PCLHistogramVisualizer::createActor (
   renwinint.xy_plot_->SetWidth (1); renwinint.xy_plot_->SetHeight (1);
 
   // Create the new window with its interactor and renderer
-  renwinint.ren_->AddActor2D (renwinint.xy_plot_);
+  renwinint.ren_->AddViewProp (renwinint.xy_plot_);
   renwinint.ren_->SetBackground (1, 1, 1);
   renwinint.win_->SetWindowName (id.c_str ());
   renwinint.win_->AddRenderer (renwinint.ren_);

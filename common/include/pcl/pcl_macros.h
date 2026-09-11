@@ -48,11 +48,9 @@
 #endif
 
 #if defined _MSC_VER
-  // 4244 : conversion from 'type1' to 'type2', possible loss of data
-  // 4661 : no suitable definition provided for explicit template instantiation request
   // 4503 : decorated name length exceeded, name was truncated
   // 4146 : unary minus operator applied to unsigned type, result still unsigned
-  #pragma warning (disable: 4018 4244 4267 4521 4251 4661 4305 4503 4146)
+  #pragma warning (disable: 4018 4521 4251 4305 4503 4146)
 #endif
 
 #ifndef _USE_MATH_DEFINES
@@ -116,11 +114,13 @@
   #define _PCL_DEPRECATED_HEADER_IMPL(Message)
 #endif
 
+// NOLINTBEGIN(bugprone-macro-parentheses)
 /**
  * \brief A handy way to inform the user of the removal deadline
  */
 #define _PCL_PREPARE_REMOVAL_MESSAGE(Major, Minor, Msg)                                 \
-  Msg " (It will be removed in PCL " BOOST_PP_STRINGIZE((Major).Minor) ")"
+  Msg " (It will be removed in PCL " BOOST_PP_STRINGIZE(Major.Minor) ")"
+// NOLINTEND(bugprone-macro-parentheses)
 
 /**
  * \brief Tests for Minor < PCL_MINOR_VERSION
@@ -214,8 +214,7 @@
     #define NOMINMAX
   #endif
 
-  #define __PRETTY_FUNCTION__ __FUNCTION__
-  #define __func__ __FUNCTION__
+  #define __PRETTY_FUNCTION__ __FUNCSIG__
 #endif
 #endif // defined _WIN32
 
@@ -323,7 +322,11 @@ pcl_round (float number)
         #define PCL_EXPORTS
     #endif
 #else
-    #define PCL_EXPORTS
+    #ifdef PCL_SYMBOL_VISIBILITY_HIDDEN
+        #define PCL_EXPORTS __attribute__ ((visibility ("default")))
+    #else
+        #define PCL_EXPORTS
+    #endif
 #endif
 
 #if defined WIN32 || defined _WIN32

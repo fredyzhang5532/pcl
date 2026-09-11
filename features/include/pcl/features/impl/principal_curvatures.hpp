@@ -43,6 +43,7 @@
 #include <pcl/features/principal_curvatures.h>
 
 #include <pcl/common/point_tests.h> // for pcl::isFinite
+#include <pcl/common/eigen.h> // for eigen33
 
 ///////////////////////////////////////////////////////////////////////////////////////////
 template <typename PointInT, typename PointNT, typename PointOutT> void
@@ -77,7 +78,7 @@ pcl::PrincipalCurvaturesEstimation<PointInT, PointNT, PointOutT>::computePointPr
   for (std::size_t idx = 0; idx < indices.size(); ++idx)
   {
     const auto normal = normals[indices[idx]].getNormalVector3fMap();
-    projected_normals[idx] = M * normal;
+    projected_normals[idx].noalias() = M * normal;
     xyz_centroid += projected_normals[idx];
   }
 

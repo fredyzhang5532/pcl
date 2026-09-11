@@ -43,6 +43,7 @@
 #include <pcl/point_types.h>
 #include <pcl/io/pcd_io.h>
 #include <pcl/registration/ndt.h>
+#include <pcl/search/kdtree.h>
 
 using namespace pcl;
 using namespace pcl::io;
@@ -60,6 +61,8 @@ TEST (PCL, NormalDistributionsTransform)
   PointCloud<PointT> output;
 
   NormalDistributionsTransform<PointT, PointT> reg;
+  reg.setNeighborhoodSearchMethod(NeighborSearchMethod::RADIUS);
+  reg.setNumberOfThreads(1);
   reg.setStepSize (0.05);
   reg.setResolution (0.025f);
   reg.setInputSource (src);

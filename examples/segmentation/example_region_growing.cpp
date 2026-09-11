@@ -45,6 +45,8 @@
 #include <pcl/segmentation/region_growing.h>
 #include <pcl/common/time.h>
 #include <pcl/console/parse.h>
+#include <pcl/search/kdtree.h> // for KdTree
+#include <pcl/point_types.h>
 
 int
 main (int argc, char** av)

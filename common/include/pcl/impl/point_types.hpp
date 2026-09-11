@@ -45,20 +45,11 @@
 #include <pcl/point_types.h>            // implementee
 #include <pcl/register_point_struct.h>  // for POINT_CLOUD_REGISTER_POINT_STRUCT, POINT_CLOUD_REGISTER_POINT_WRAPPER
 
-#include <boost/mpl/and.hpp>            // for boost::mpl::and_
-#include <boost/mpl/bool.hpp>           // for boost::mpl::bool_
-#include <boost/mpl/contains.hpp>       // for boost::mpl::contains
-#include <boost/mpl/fold.hpp>           // for boost::mpl::fold
-#include <boost/mpl/or.hpp>             // for boost::mpl::or_
-#include <boost/mpl/placeholders.hpp>   // for boost::mpl::_1, boost::mpl::_2
-#include <boost/mpl/vector.hpp>         // for boost::mpl::vector
-
 #include <Eigen/Core>                   // for MatrixMap
 
 #include <algorithm>                    // for copy_n, fill_n
 #include <cstdint>                      // for uint8_t, uint32_t
 #include <ostream>                      // for ostream, operator<<
-#include <type_traits>                  // for enable_if_t
 
 // Define all PCL point types
 #define PCL_POINT_TYPES         \
@@ -165,7 +156,7 @@ namespace pcl
     namespace traits
     {
       template<typename FeaturePointT> struct descriptorSize {};
-   
+
       template<> struct descriptorSize<PFHSignature125> { static constexpr const int value = 125; };
       template<> struct descriptorSize<PFHRGBSignature250> { static constexpr const int value = 250; };
       template<> struct descriptorSize<ShapeContext1980> { static constexpr const int value = 1980; };
@@ -175,13 +166,14 @@ namespace pcl
       template<> struct descriptorSize<FPFHSignature33> { static constexpr const int value = 33; };
       template<> struct descriptorSize<VFHSignature308> { static constexpr const int value = 308; };
       template<> struct descriptorSize<GRSDSignature21> { static constexpr const int value = 21; };
-      template<> struct descriptorSize<BRISKSignature512> { static constexpr const int value = 512; };
+      template<> struct descriptorSize<BRISKSignature512> { static constexpr const int value = 64; };
       template<> struct descriptorSize<ESFSignature640> { static constexpr const int value = 640; };
       template<> struct descriptorSize<GASDSignature512> { static constexpr const int value = 512; };
       template<> struct descriptorSize<GASDSignature984> { static constexpr const int value = 984; };
       template<> struct descriptorSize<GASDSignature7992> { static constexpr const int value = 7992; };
       template<> struct descriptorSize<GFPFHSignature16> { static constexpr const int value = 16; };
       template<> struct descriptorSize<Narf36> { static constexpr const int value = 36; };
+      template<> struct descriptorSize<NormalBasedSignature12> { static constexpr const int value = 12; };
       template<int N> struct descriptorSize<Histogram<N>> { static constexpr const int value = N; };
 
 
@@ -189,7 +181,7 @@ namespace pcl
       static constexpr int descriptorSize_v = descriptorSize<FeaturePointT>::value;
     }
   }
-  
+
   using Vector2fMap = Eigen::Map<Eigen::Vector2f>;
   using Vector2fMapConst = const Eigen::Map<const Eigen::Vector2f>;
   using Array3fMap = Eigen::Map<Eigen::Array3f>;
@@ -208,6 +200,8 @@ namespace pcl
   using Vector4cMap = Eigen::Map<Vector4c, Eigen::Aligned>;
   using Vector4cMapConst = const Eigen::Map<const Vector4c, Eigen::Aligned>;
 
+// note: 4th homogeneous coordinate is uninitialized, has to be set to 1
+// explicitly if needed for matrix operations.
 #define PCL_ADD_UNION_POINT4D \
   union EIGEN_ALIGN16 { \
     float data[4]; \
@@ -460,7 +454,7 @@ namespace pcl
     inline constexpr PointXYZI (float _intensity = 0.f) : PointXYZI(0.f, 0.f, 0.f, _intensity) {}
 
     inline constexpr PointXYZI (float _x, float _y, float _z, float _intensity = 0.f) : _PointXYZI{{{_x, _y, _z, 1.0f}}, {{_intensity}}} {}
-    
+
     friend std::ostream& operator << (std::ostream& os, const PointXYZI& p);
   };
 
@@ -689,7 +683,7 @@ namespace pcl
   PCL_EXPORTS std::ostream& operator << (std::ostream& os, const PointXYZHSV& p);
   struct EIGEN_ALIGN16 PointXYZHSV : public _PointXYZHSV
   {
-    inline constexpr PointXYZHSV (const _PointXYZHSV &p) : 
+    inline constexpr PointXYZHSV (const _PointXYZHSV &p) :
       PointXYZHSV{p.x, p.y, p.z, p.h, p.s, p.v} {}
 
     inline constexpr PointXYZHSV (): PointXYZHSV (0.f, 0.f, 0.f) {}
@@ -714,10 +708,10 @@ namespace pcl
   // NOLINTBEGIN(modernize-use-default-member-init)
   struct PointXY
   {
-    union 
-    { 
-      float data[2]; 
-      struct 
+    union
+    {
+      float data[2];
+      struct
       {
         float x;
         float y;
@@ -729,7 +723,7 @@ namespace pcl
 
     inline pcl::Vector2fMap getVector2fMap () { return (pcl::Vector2fMap (data)); }
     inline pcl::Vector2fMapConst getVector2fMap () const { return (pcl::Vector2fMapConst (data)); }
-    
+
     friend std::ostream& operator << (std::ostream& os, const PointXY& p);
   };
   // NOLINTEND(modernize-use-default-member-init)
@@ -929,8 +923,8 @@ namespace pcl
     inline constexpr PointXYZRGBNormal (float _x, float _y, float _z, std::uint8_t _r, std::uint8_t _g, std::uint8_t _b,
                               float n_x, float n_y, float n_z, float _curvature = 0.f) :
       _PointXYZRGBNormal{
-        {{_x, _y, _z, 1.0f}}, 
-        {{n_x, n_y, n_z, 0.0f}}, 
+        {{_x, _y, _z, 1.0f}},
+        {{n_x, n_y, n_z, 0.0f}},
         {{ {{{_b, _g, _r, 255u}}}, _curvature }}
       }
     {}
@@ -938,8 +932,8 @@ namespace pcl
     inline constexpr PointXYZRGBNormal (float _x, float _y, float _z, std::uint8_t _r, std::uint8_t _g, std::uint8_t _b,
                               std::uint8_t _a, float n_x, float n_y, float n_z, float _curvature = 0.f) :
       _PointXYZRGBNormal{
-        {{_x, _y, _z, 1.0f}}, 
-        {{n_x, n_y, n_z, 0.0f}}, 
+        {{_x, _y, _z, 1.0f}},
+        {{n_x, n_y, n_z, 0.0f}},
         {{ {{{_b, _g, _r, _a}}}, _curvature }}
       }
     {}
@@ -981,8 +975,8 @@ namespace pcl
     inline constexpr PointXYZINormal (float _x, float _y, float _z, float _intensity,
                             float n_x, float n_y, float n_z, float _curvature = 0.f) :
       _PointXYZINormal{
-        {{_x, _y, _z, 1.0f}}, 
-        {{n_x, n_y, n_z, 0.0f}}, 
+        {{_x, _y, _z, 1.0f}},
+        {{n_x, n_y, n_z, 0.0f}},
         {{_intensity, _curvature}}
       }
     {}
@@ -1024,11 +1018,11 @@ namespace pcl
     inline constexpr PointXYZLNormal (float _x, float _y, float _z, std::uint32_t _label,
                             float n_x, float n_y, float n_z, float _curvature = 0.f) :
       _PointXYZLNormal{
-        {{_x, _y, _z, 1.0f}}, 
-        {{n_x, n_y, n_z, 0.0f}}, 
+        {{_x, _y, _z, 1.0f}},
+        {{n_x, n_y, n_z, 0.0f}},
         {{_label, _curvature}}
       }
-    {} 
+    {}
 
     friend std::ostream& operator << (std::ostream& os, const PointXYZLNormal& p);
   };
@@ -1636,7 +1630,7 @@ namespace pcl
     inline constexpr PointWithScale (float _x, float _y, float _z, float _scale = 1.f,
                            float _angle = -1.f, float _response = 0.f, int _octave = 0) :
       _PointWithScale{{{_x, _y, _z, 1.0f}}, {_scale}, _angle, _response, _octave } {}
-    
+
     friend std::ostream& operator << (std::ostream& os, const PointWithScale& p);
   };
 
@@ -1673,11 +1667,11 @@ namespace pcl
       PointSurfel{0.0f, 0.0f, 0.0f, 0.0f, 0.0f, 0.0f, 0u, 0u, 0u, 0u, 0.0f, 0.0f, 0.0f} {}
 
     inline constexpr PointSurfel (float _x, float _y, float _z, float _nx,
-                           float _ny, float _nz, std::uint8_t _r, std::uint8_t _g, std::uint8_t _b, std::uint8_t _a, 
+                           float _ny, float _nz, std::uint8_t _r, std::uint8_t _g, std::uint8_t _b, std::uint8_t _a,
                            float _radius, float _confidence, float _curvature) :
       _PointSurfel{
-        {{_x, _y, _z, 1.0f}}, 
-        {{_nx, _ny, _nz, 0.0f}}, 
+        {{_x, _y, _z, 1.0f}},
+        {{_nx, _ny, _nz, 0.0f}},
         {{{{{_b, _g, _r, _a}}}, _radius, _confidence, _curvature}}
       } {}
 
@@ -1702,7 +1696,7 @@ namespace pcl
   {
     inline constexpr PointDEM (const _PointDEM &p) :
       PointDEM{p.x, p.y, p.z, p.intensity, p.intensity_variance, p.height_variance} {}
-   
+
     inline constexpr PointDEM (): PointDEM (0.f, 0.f, 0.f) {}
 
     inline constexpr PointDEM (float _x, float _y, float _z): PointDEM (_x, _y, _z, 0.f, 0.f, 0.f) {}
@@ -1710,7 +1704,7 @@ namespace pcl
     inline constexpr PointDEM (float _x, float _y, float _z, float _intensity,
                      float _intensity_variance, float _height_variance) :
       _PointDEM{{{_x, _y, _z, 1.0f}}, _intensity, _intensity_variance, _height_variance} {}
-    
+
     friend std::ostream& operator << (std::ostream& os, const PointDEM& p);
   };
 
@@ -2130,168 +2124,4 @@ struct FieldMatches<PointT, fields::rgb>
   }
 };
 
-
-// We're doing a lot of black magic with Boost here, so disable warnings in Maintainer mode, as we will never
-// be able to fix them anyway
-#if defined _MSC_VER
-  #pragma warning(disable: 4201)
-#endif
-
-namespace traits
-{
-
-  /** \brief Metafunction to check if a given point type has a given field.
-   *
-   *  Example usage at run-time:
-   *
-   *  \code
-   *  bool curvature_available = pcl::traits::has_field<PointT, pcl::fields::curvature>::value;
-   *  \endcode
-   *
-   *  Example usage at compile-time:
-   *
-   *  \code
-   *  BOOST_MPL_ASSERT_MSG ((pcl::traits::has_field<PointT, pcl::fields::label>::value),
-   *                        POINT_TYPE_SHOULD_HAVE_LABEL_FIELD,
-   *                        (PointT));
-   *  \endcode
-   */
-  template <typename PointT, typename Field>
-  struct has_field : boost::mpl::contains<typename pcl::traits::fieldList<PointT>::type, Field>::type
-  { };
-
-  /** Metafunction to check if a given point type has all given fields. */
-  template <typename PointT, typename Field>
-  struct has_all_fields : boost::mpl::fold<Field,
-                                           boost::mpl::bool_<true>,
-                                           boost::mpl::and_<boost::mpl::_1,
-                                                            has_field<PointT, boost::mpl::_2> > >::type
-  { };
-
-  /** Metafunction to check if a given point type has any of the given fields. */
-  template <typename PointT, typename Field>
-  struct has_any_field : boost::mpl::fold<Field,
-                                          boost::mpl::bool_<false>,
-                                          boost::mpl::or_<boost::mpl::_1,
-                                                          has_field<PointT, boost::mpl::_2> > >::type
-  { };
-
-  /** \brief Traits defined for ease of use with fields already registered before
-   *
-   * has_<fields to be detected>: struct with `value` datamember defined at compiletime
-   * has_<fields to be detected>_v: constexpr boolean
-   * Has<Fields to be detected>: concept modelling name alias for `enable_if`
-   */
-
-  /** Metafunction to check if a given point type has x and y fields. */
-  template <typename PointT>
-  struct has_xy : has_all_fields<PointT, boost::mpl::vector<pcl::fields::x,
-                                                            pcl::fields::y> >
-  { };
-
-  template <typename PointT>
-  constexpr auto has_xy_v = has_xy<PointT>::value;
-
-  template <typename PointT>
-  using HasXY = std::enable_if_t<has_xy_v<PointT>, bool>;
-
-  template <typename PointT>
-  using HasNoXY = std::enable_if_t<!has_xy_v<PointT>, bool>;
-
-  /** Metafunction to check if a given point type has x, y, and z fields. */
-  template <typename PointT>
-  struct has_xyz : has_all_fields<PointT, boost::mpl::vector<pcl::fields::x,
-                                                             pcl::fields::y,
-                                                             pcl::fields::z> >
-  { };
-
-  template <typename PointT>
-  constexpr auto has_xyz_v = has_xyz<PointT>::value;
-
-  template <typename PointT>
-  using HasXYZ = std::enable_if_t<has_xyz_v<PointT>, bool>;
-
-  template <typename PointT>
-  using HasNoXYZ = std::enable_if_t<!has_xyz_v<PointT>, bool>;
-
-  /** Metafunction to check if a given point type has normal_x, normal_y, and
-    * normal_z fields. */
-  template <typename PointT>
-  struct has_normal : has_all_fields<PointT, boost::mpl::vector<pcl::fields::normal_x,
-                                                                pcl::fields::normal_y,
-                                                                pcl::fields::normal_z> >
-  { };
-
-  template <typename PointT>
-  constexpr auto has_normal_v = has_normal<PointT>::value;
-
-  template <typename PointT>
-  using HasNormal = std::enable_if_t<has_normal_v<PointT>, bool>;
-
-  template <typename PointT>
-  using HasNoNormal = std::enable_if_t<!has_normal_v<PointT>, bool>;
-
-  /** Metafunction to check if a given point type has curvature field. */
-  template <typename PointT>
-  struct has_curvature : has_field<PointT, pcl::fields::curvature>
-  { };
-
-  template <typename PointT>
-  constexpr auto has_curvature_v = has_curvature<PointT>::value;
-
-  template <typename PointT>
-  using HasCurvature = std::enable_if_t<has_curvature_v<PointT>, bool>;
-
-  template <typename PointT>
-  using HasNoCurvature = std::enable_if_t<!has_curvature_v<PointT>, bool>;
-
-  /** Metafunction to check if a given point type has intensity field. */
-  template <typename PointT>
-  struct has_intensity : has_field<PointT, pcl::fields::intensity>
-  { };
-
-  template <typename PointT>
-  constexpr auto has_intensity_v = has_intensity<PointT>::value;
-
-  template <typename PointT>
-  using HasIntensity = std::enable_if_t<has_intensity_v<PointT>, bool>;
-
-  template <typename PointT>
-  using HasNoIntensity = std::enable_if_t<!has_intensity_v<PointT>, bool>;
-
-  /** Metafunction to check if a given point type has either rgb or rgba field. */
-  template <typename PointT>
-  struct has_color : has_any_field<PointT, boost::mpl::vector<pcl::fields::rgb,
-                                                              pcl::fields::rgba> >
-  { };
-
-  template <typename PointT>
-  constexpr auto has_color_v = has_color<PointT>::value;
-
-  template <typename PointT>
-  using HasColor = std::enable_if_t<has_color_v<PointT>, bool>;
-
-  template <typename PointT>
-  using HasNoColor = std::enable_if_t<!has_color_v<PointT>, bool>;
-
-  /** Metafunction to check if a given point type has label field. */
-  template <typename PointT>
-  struct has_label : has_field<PointT, pcl::fields::label>
-  { };
-
-  template <typename PointT>
-  constexpr auto has_label_v = has_label<PointT>::value;
-
-  template <typename PointT>
-  using HasLabel = std::enable_if_t<has_label_v<PointT>, bool>;
-
-  template <typename PointT>
-  using HasNoLabel = std::enable_if_t<!has_label_v<PointT>, bool>;
-}
-
-#if defined _MSC_VER
-  #pragma warning(default: 4201)
-#endif
-
 } // namespace pcl
-

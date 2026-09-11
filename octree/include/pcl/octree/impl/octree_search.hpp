@@ -398,13 +398,9 @@ OctreePointCloudSearch<PointT, LeafContainerT, BranchContainerT>::
       else {
         // we reached leaf node level
         const auto* child_leaf = static_cast<const LeafNode*>(child_node);
-        Indices decoded_point_vector;
 
-        // decode leaf node into decoded_point_vector
-        (*child_leaf)->getPointIndices(decoded_point_vector);
-
-        // Linearly iterate over all decoded (unsorted) points
-        for (const auto& index : decoded_point_vector) {
+        // Linearly iterate over all points in the leaf
+        for (const auto& index : (*child_leaf)->getPointIndicesVector()) {
           const PointT& candidate_point = this->getPointByIndex(index);
 
           // calculate point distance to search point
@@ -557,9 +553,9 @@ OctreePointCloudSearch<PointT, LeafContainerT, BranchContainerT>::boxSearchRecur
 
     // test if search region overlap with voxel space
 
-    if (!((lower_voxel_corner(0) > max_pt(0)) || (min_pt(0) > upper_voxel_corner(0)) ||
-          (lower_voxel_corner(1) > max_pt(1)) || (min_pt(1) > upper_voxel_corner(1)) ||
-          (lower_voxel_corner(2) > max_pt(2)) || (min_pt(2) > upper_voxel_corner(2)))) {
+    if ((lower_voxel_corner(0) <= max_pt(0)) && (min_pt(0) <= upper_voxel_corner(0)) &&
+        (lower_voxel_corner(1) <= max_pt(1)) && (min_pt(1) <= upper_voxel_corner(1)) &&
+        (lower_voxel_corner(2) <= max_pt(2)) && (min_pt(2) <= upper_voxel_corner(2))) {
 
       if (child_node->getNodeType() == BRANCH_NODE) {
         // we have not reached maximum tree depth

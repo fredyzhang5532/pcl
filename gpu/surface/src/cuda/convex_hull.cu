@@ -44,6 +44,7 @@
 //#include <pcl/gpu/utils/device/funcattrib.hpp>
 #include <pcl/gpu/utils/safe_call.hpp>
 
+#include <thrust/distance.h>
 #include <thrust/tuple.h>
 #include <thrust/iterator/counting_iterator.h>
 #include <thrust/iterator/zip_iterator.h>
@@ -136,11 +137,15 @@ namespace pcl
       int transform_reduce_index(It beg, It end, Unary unop, Init init, Binary binary)
 	  {
 	    thrust::counting_iterator<int> cbeg(0);
+#if THRUST_VERSION >= 300100
+		thrust::counting_iterator<int> cend = cbeg + cuda::std::distance(beg, end);
+#else
 		thrust::counting_iterator<int> cend = cbeg + thrust::distance(beg, end);
+#endif
 
-	    thrust::tuple<float, int> t = transform_reduce(
-		  make_zip_iterator(thrust::make_tuple(beg, cbeg)),
-		  make_zip_iterator(thrust::make_tuple(end, cend)),
+	    thrust::tuple<float, int> t = thrust::transform_reduce(
+		  thrust::make_zip_iterator(thrust::make_tuple(beg, cbeg)),
+		  thrust::make_zip_iterator(thrust::make_tuple(end, cend)),
 		  unop, init, binary);
 
 		return thrust::get<1>(t);
@@ -194,11 +199,11 @@ void pcl::device::PointStream::computeInitalSimplex()
   simplex.x1 = tr(p1);  simplex.x2 = tr(p2);  simplex.x3 = tr(p3);  simplex.x4 = tr(p4);
   simplex.i1 = minx;    simplex.i2 = maxx;    simplex.i3 = maxl;    simplex.i4 = maxp;
 
-  float maxy = transform_reduce(beg, end, Y(), std::numeric_limits<float>::min(), thrust::maximum<float>());
-  float miny = transform_reduce(beg, end, Y(), std::numeric_limits<float>::max(), thrust::minimum<float>());
+  float maxy = thrust::transform_reduce(beg, end, Y(), std::numeric_limits<float>::min(), thrust::maximum<float>());
+  float miny = thrust::transform_reduce(beg, end, Y(), std::numeric_limits<float>::max(), thrust::minimum<float>());
 
-  float maxz = transform_reduce(beg, end, Z(), std::numeric_limits<float>::min(), thrust::maximum<float>());
-  float minz = transform_reduce(beg, end, Z(), std::numeric_limits<float>::max(), thrust::minimum<float>());
+  float maxz = thrust::transform_reduce(beg, end, Z(), std::numeric_limits<float>::min(), thrust::maximum<float>());
+  float minz = thrust::transform_reduce(beg, end, Z(), std::numeric_limits<float>::max(), thrust::minimum<float>());
 
   float dx = (p2.x - p1.x);
   float dy = (maxy - miny);

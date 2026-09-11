@@ -86,7 +86,7 @@ pcl::SampleConsensusModelTorus<PointT, PointNT>::isSampleGood(
 
 //////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 float
-crossDot(Eigen::Vector3f v1, Eigen::Vector3f v2, Eigen::Vector3f v3)
+crossDot(const Eigen::Vector3f& v1, const Eigen::Vector3f& v2, const Eigen::Vector3f& v3)
 {
   return v1.cross(v2).dot(v3);
 }
@@ -213,7 +213,11 @@ pcl::SampleConsensusModelTorus<PointT, PointNT>::computeModelCoefficients(
     B << -d.dot(p0), -d.dot(p1), -d.dot(p2), -d.dot(p3);
 
     Eigen::Matrix<float, -1, -1> sol;
-    sol = A.bdcSvd(Eigen::ComputeThinU | Eigen::ComputeThinV).solve(B);
+#if EIGEN_VERSION_AT_LEAST(5, 0, 0)
+    sol = A.jacobiSvd<Eigen::ComputeThinU | Eigen::ComputeThinV>().solve(B);
+#else
+    sol = A.jacobiSvd(Eigen::ComputeThinU | Eigen::ComputeThinV).solve(B);
+#endif
 
     const float r_min = -sol(0);
     const float D = sol(1);
@@ -303,6 +307,7 @@ pcl::SampleConsensusModelTorus<PointT, PointNT>::selectWithinDistance(
     inliers.clear();
     return;
   }
+  const float squared_threshold = threshold * threshold;
   inliers.clear();
   error_sqr_dists_.clear();
   inliers.reserve(indices_->size());
@@ -315,13 +320,13 @@ pcl::SampleConsensusModelTorus<PointT, PointNT>::selectWithinDistance(
     Eigen::Vector3f torus_closest;
     projectPointToTorus(pt, pt_n, model_coefficients, torus_closest);
 
-    const float distance = (torus_closest - pt).norm();
+    const float distance = (torus_closest - pt).squaredNorm();
 
-    if (distance < threshold) {
+    if (distance < squared_threshold) {
       // Returns the indices of the points whose distances are smaller than the
       // threshold
       inliers.push_back((*indices_)[i]);
-      error_sqr_dists_.push_back(distance);
+      error_sqr_dists_.push_back(std::sqrt(distance));
     }
   }
 }
@@ -335,6 +340,7 @@ pcl::SampleConsensusModelTorus<PointT, PointNT>::countWithinDistance(
   if (!isModelValid(model_coefficients))
     return (0);
 
+  const float squared_threshold = threshold * threshold;
   std::size_t nr_p = 0;
 
   for (std::size_t i = 0; i < indices_->size(); ++i) {
@@ -344,9 +350,9 @@ pcl::SampleConsensusModelTorus<PointT, PointNT>::countWithinDistance(
     Eigen::Vector3f torus_closest;
     projectPointToTorus(pt, pt_n, model_coefficients, torus_closest);
 
-    const float distance = (torus_closest - pt).norm();
+    const float distance = (torus_closest - pt).squaredNorm();
 
-    if (distance < threshold) {
+    if (distance < squared_threshold) {
       nr_p++;
     }
   }

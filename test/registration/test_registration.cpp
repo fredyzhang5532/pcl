@@ -58,6 +58,7 @@
 #include <pcl/features/ppf.h>
 #include <pcl/registration/ppf_registration.h>
 #include <pcl/filters/voxel_grid.h>
+#include <pcl/search/kdtree.h>
 // We need Histogram<2> to function, so we'll explicitly add kdtree_flann.hpp here
 #include <pcl/kdtree/impl/kdtree_flann.hpp>
 //(pcl::Histogram<2>)
@@ -155,30 +156,26 @@ TEST (PCL, findFeatureCorrespondences)
 
 /////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 // This test if the ICP algorithm can successfully find the transformation of a cloud that has been
-// moved 0.7 in x direction.
+// moved 0.2 in z direction.
 // It indirectly test the KDTree doesn't get an empty input cloud, see #3624
 // It is more or less a copy of https://github.com/PointCloudLibrary/pcl/blob/cc7fe363c6463a0abc617b1e17e94ab4bd4169ef/doc/tutorials/content/sources/iterative_closest_point/iterative_closest_point.cpp
 TEST(PCL, ICP_translated)
 {
-  pcl::PointCloud<pcl::PointXYZ>::Ptr cloud_in(new pcl::PointCloud<pcl::PointXYZ>(5,1));
+  pcl::PointCloud<pcl::PointXYZ>::Ptr cloud_in(new pcl::PointCloud<pcl::PointXYZ>);
   pcl::PointCloud<pcl::PointXYZ>::Ptr cloud_out(new pcl::PointCloud<pcl::PointXYZ>);
 
   // Fill in the CloudIn data
-  for (auto& point : *cloud_in)
-  {
-    point.x = 1024 * rand() / (RAND_MAX + 1.0f);
-    point.y = 1024 * rand() / (RAND_MAX + 1.0f);
-    point.z = 1024 * rand() / (RAND_MAX + 1.0f);
-  }
+  *cloud_in = cloud_source;
 
   *cloud_out = *cloud_in;
 
   for (auto& point : *cloud_out)
-    point.x += 0.7f;
+    point.z += 0.2f;
 
   pcl::IterativeClosestPoint<pcl::PointXYZ, pcl::PointXYZ> icp;
   icp.setInputSource(cloud_in);
   icp.setInputTarget(cloud_out);
+  icp.setMaximumIterations (50);
 
   pcl::PointCloud<pcl::PointXYZ> Final;
   icp.align(Final);
@@ -190,9 +187,50 @@ TEST(PCL, ICP_translated)
   EXPECT_LT(icp.getFitnessScore(), 1e-6);
 
   // Ensure that the translation found is within acceptable threshold.
-  EXPECT_NEAR(icp.getFinalTransformation()(0, 3), 0.7, 2e-3);
+  EXPECT_NEAR(icp.getFinalTransformation()(0, 0), 1.0, 2e-3);
+  EXPECT_NEAR(icp.getFinalTransformation()(1, 1), 1.0, 2e-3);
+  EXPECT_NEAR(icp.getFinalTransformation()(2, 2), 1.0, 2e-3);
+  EXPECT_NEAR(icp.getFinalTransformation()(0, 3), 0.0, 2e-3);
   EXPECT_NEAR(icp.getFinalTransformation()(1, 3), 0.0, 2e-3);
-  EXPECT_NEAR(icp.getFinalTransformation()(2, 3), 0.0, 2e-3);
+  EXPECT_NEAR(icp.getFinalTransformation()(2, 3), 0.2, 2e-3);
+}
+
+//////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+TEST(PCL, Registration_getFitnessScore_Indices)
+{
+  pcl::PointCloud<pcl::PointXYZ>::Ptr cloud_in(new pcl::PointCloud<pcl::PointXYZ>);
+  pcl::PointCloud<pcl::PointXYZ>::Ptr cloud_out(new pcl::PointCloud<pcl::PointXYZ>);
+
+  cloud_in->push_back(pcl::PointXYZ(0, 0, 0));
+  cloud_in->push_back(pcl::PointXYZ(0, 1, 0));
+  cloud_in->push_back(pcl::PointXYZ(0, 0, 1));
+  cloud_in->push_back(pcl::PointXYZ(10, 0, 0));
+
+  cloud_out->push_back(pcl::PointXYZ(0, 0, 0));
+  cloud_out->push_back(pcl::PointXYZ(0, 1, 0));
+  cloud_out->push_back(pcl::PointXYZ(0, 0, 1));
+  cloud_out->push_back(pcl::PointXYZ(10, 0, 0.5)); // Dist squared = 0.25
+
+  RegistrationWrapper<pcl::PointXYZ, pcl::PointXYZ> reg;
+  reg.setInputSource(cloud_in);
+  reg.setInputTarget(cloud_out);
+
+  pcl::IndicesPtr indices(new pcl::Indices());
+  indices->push_back(0);
+  indices->push_back(1);
+  indices->push_back(2);
+  reg.setIndices(indices);
+
+  pcl::PointCloud<pcl::PointXYZ> final_cloud;
+  reg.align(final_cloud);
+
+  // With use_indices = false (default), should calculate score using all points
+  // mean of squared distances: (0 + 0 + 0 + 0.25) / 4 = 0.0625
+  EXPECT_NEAR(reg.getFitnessScore(1.0, false), 0.0625, 1e-4);
+
+  // With use_indices = true, should calculate score using only indices (points 0, 1, 2)
+  // mean of squared distances: (0 + 0 + 0) / 3 = 0.0
+  EXPECT_NEAR(reg.getFitnessScore(1.0, true), 0.0, 1e-4);
 }
 
 //////////////////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -232,6 +270,39 @@ TEST (PCL, IterativeClosestPoint)
   EXPECT_EQ (transformation (3, 3), 1);
 }
 
+template <typename Scalar> void
+runICPWithNormals ()
+{
+  using PointT = PointNormal;
+  PointCloud<PointT>::Ptr src (new PointCloud<PointT>);
+  copyPointCloud (cloud_source, *src);
+  PointCloud<PointT>::Ptr tgt (new PointCloud<PointT>);
+  copyPointCloud (cloud_target, *tgt);
+  PointCloud<PointT> output;
+
+  // IterativeClosestPointWithNormals needs normals on both clouds
+  NormalEstimation<PointT, PointT> norm_est;
+  norm_est.setSearchMethod (search::KdTree<PointT>::Ptr (new search::KdTree<PointT>));
+  norm_est.setKSearch (10);
+  norm_est.setInputCloud (src);
+  norm_est.compute (*src);
+  norm_est.setInputCloud (tgt);
+  norm_est.compute (*tgt);
+
+  IterativeClosestPointWithNormals<PointT, PointT, Scalar> reg;
+  reg.setInputSource (src);
+  reg.setInputTarget (tgt);
+  reg.setMaximumIterations (50);
+  reg.setTransformationEpsilon (1e-8);
+  reg.setMaxCorrespondenceDistance (0.05);
+
+  // Register and check that the alignment succeeded
+  reg.align (output);
+  EXPECT_EQ (output.size (), cloud_source.size ());
+  EXPECT_TRUE (reg.hasConverged ());
+  EXPECT_LT (reg.getFitnessScore (), 0.001);
+}
+
 TEST (PCL, IterativeClosestPointWithNormals)
 {
   IterativeClosestPointWithNormals<PointNormal, PointNormal, float> reg_float;
@@ -241,6 +312,10 @@ TEST (PCL, IterativeClosestPointWithNormals)
   IterativeClosestPointWithNormals<PointNormal, PointNormal, double> reg_double;
   reg_double.setUseSymmetricObjective(true);
   EXPECT_TRUE(reg_double.getUseSymmetricObjective());
+
+  // Test the actual alignment for both float and double precision
+  runICPWithNormals<float> ();
+  runICPWithNormals<double> ();
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////

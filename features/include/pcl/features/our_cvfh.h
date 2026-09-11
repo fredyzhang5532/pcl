@@ -41,6 +41,7 @@
 #pragma once
 
 #include <pcl/features/feature.h>
+#include <pcl/point_types.h>       // for pcl::VFHSignature308, pcl::PointNormal
 
 namespace pcl
 {
@@ -114,7 +115,7 @@ namespace pcl
         homMatrix = transformPC.matrix ();
 
         Eigen::Matrix4f trans_copy = trans.inverse ();
-        trans = trans_copy * center_mat * homMatrix;
+        trans.noalias() = trans_copy * center_mat * homMatrix;
         return trans;
       }
 

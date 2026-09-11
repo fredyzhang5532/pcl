@@ -48,6 +48,7 @@
 #include <pcl/geometry/polygon_operations.h>
 #include <pcl/io/pcd_io.h>
 #include <pcl/sample_consensus/sac_model_plane.h> // for pointToPlaneDistance
+#include <pcl/search/kdtree.h>
 #include <pcl/segmentation/edge_aware_plane_comparator.h>
 #include <pcl/segmentation/euclidean_cluster_comparator.h>
 #include <pcl/segmentation/extract_clusters.h>
@@ -70,8 +71,7 @@ using namespace std::chrono_literals;
 template <typename PointT>
 class ObjectSelection {
 public:
-  ObjectSelection()
-  : plane_comparator_(new EdgeAwarePlaneComparator<PointT, Normal>), rgb_data_()
+  ObjectSelection() : plane_comparator_(new EdgeAwarePlaneComparator<PointT, Normal>)
   {
     // Set the parameters for planar segmentation
     plane_comparator_->setDistanceThreshold(0.01f, false);
@@ -650,7 +650,7 @@ private:
   // Segmentation
   typename EdgeAwarePlaneComparator<PointT, Normal>::Ptr plane_comparator_;
   PointIndices::Ptr plane_indices_;
-  unsigned char* rgb_data_;
+  unsigned char* rgb_data_{nullptr};
   std::vector<float> distance_map_;
 
   // Results

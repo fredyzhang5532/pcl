@@ -36,6 +36,7 @@
 
 #include "internal.hpp"
 
+#include <thrust/version.h>
 #include <thrust/tuple.h>
 #include <thrust/device_ptr.h>
 #include <thrust/transform_reduce.h>
@@ -89,7 +90,7 @@ void pcl::device::compute3DCentroid(const DeviceArray<PointT>& cloud, float3& ce
     thrust::device_ptr<PointT> src_beg((PointT*)cloud.ptr());
     thrust::device_ptr<PointT> src_end = src_beg + cloud.size();
 
-    centroid = transform_reduce(src_beg, src_beg, PointT2float3<PointT>(), make_float3(0.f, 0.f, 0.f), PlusFloat3());
+    centroid = thrust::transform_reduce(src_beg, src_beg, PointT2float3<PointT>(), make_float3(0.f, 0.f, 0.f), PlusFloat3());
     centroid *= 1.f/cloud.size();
 }
 
@@ -105,7 +106,7 @@ void pcl::device::compute3DCentroid(const DeviceArray<PointT>& cloud, const Indi
         thrust::device_ptr<int> map_end = map_beg + indices.size();
 
 
-        centroid = transform_reduce(make_permutation_iterator(src_beg, map_beg),
+        centroid = thrust::transform_reduce(make_permutation_iterator(src_beg, map_beg),
             make_permutation_iterator(src_beg, map_end),
             PointT2float3<PointT>(), make_float3(0.f, 0.f, 0.f), PlusFloat3());
 
@@ -123,10 +124,14 @@ float3 pcl::device::getMaxDistance(const DeviceArray<PointT>& cloud, const float
     thrust::counting_iterator<int> ce = cf + cloud.size();
 
     thrust::tuple<float, int> init(0.f, 0);
+#if THRUST_VERSION >= 300100
+    cuda::maximum<thrust::tuple<float, int>> op;
+#else
     thrust::maximum<thrust::tuple<float, int>> op;
+#endif
 
     thrust::tuple<float, int> res =
-        transform_reduce(
+        thrust::transform_reduce(
         make_zip_iterator(make_tuple( src_beg, cf )),
         make_zip_iterator(make_tuple( src_beg, ce )),
         TupleDistCvt(pivot), init, op);
@@ -151,9 +156,13 @@ float3 pcl::device::getMaxDistance(const DeviceArray<PointT>& cloud, const Indic
     thrust::counting_iterator<int> ce = cf + indices.size();
 
     thrust::tuple<float, int> init(0.f, 0);
+#if THRUST_VERSION >= 300100
+    cuda::maximum<thrust::tuple<float, int>> op;
+#else
     thrust::maximum<thrust::tuple<float, int>> op;
+#endif
 
-    thrust::tuple<float, int> res = transform_reduce(
+    thrust::tuple<float, int> res = thrust::transform_reduce(
         make_zip_iterator(make_tuple( make_permutation_iterator(src_beg, map_beg), cf )),
         make_zip_iterator(make_tuple( make_permutation_iterator(src_beg, map_end), ce )),
         TupleDistCvt(pivot), init, op);

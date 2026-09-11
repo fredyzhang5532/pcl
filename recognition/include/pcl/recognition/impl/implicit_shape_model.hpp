@@ -44,6 +44,7 @@
 #include "../implicit_shape_model.h"
 #include <pcl/filters/voxel_grid.h> // for VoxelGrid
 #include <pcl/filters/extract_indices.h> // for ExtractIndices
+#include <pcl/search/auto.h> // for autoSelectMethod
 
 #include <pcl/memory.h>  // for dynamic_pointer_cast
 
@@ -171,7 +172,7 @@ pcl::features::ISMVoteList<PointT>::findStrongestPeaks (
   {
     // find best peak with taking into consideration peak flags
     double best_density = -1.0;
-    Eigen::Vector3f strongest_peak;
+    Eigen::Vector3f strongest_peak = Eigen::Vector3f::Constant (-1);
     int best_peak_ind (-1);
     int peak_counter (0);
     for (int i = 0; i < NUM_INIT_PTS; i++)
@@ -188,7 +189,8 @@ pcl::features::ISMVoteList<PointT>::findStrongestPeaks (
       }
     }
 
-    if( peak_counter == 0 )
+    if( best_density == -1.0 || strongest_peak == Eigen::Vector3f::Constant (-1) ||
+        best_peak_ind == -1 || peak_counter == 0 )
       break;// no peaks
 
     pcl::ISMPeak peak;
@@ -220,9 +222,7 @@ pcl::features::ISMVoteList<PointT>::validateTree ()
 {
   if (!tree_is_valid_)
   {
-    if (tree_ == nullptr)
-      tree_.reset (new pcl::KdTreeFLANN<pcl::InterestPoint>);
-    tree_->setInputCloud (votes_);
+    tree_.reset (pcl::search::autoSelectMethod<pcl::InterestPoint>(votes_, false, pcl::search::Purpose::radius_search));
     k_ind_.resize ( votes_->size (), -1 );
     k_sqr_dist_.resize ( votes_->size (), 0.0f );
     tree_is_valid_ = true;
@@ -522,7 +522,7 @@ pcl::features::ISMModel::operator = (const pcl::features::ISMModel& other)
       for (unsigned int i_dim = 0; i_dim < this->descriptors_dimension_; i_dim++)
         this->clusters_centers_ (i_cluster, i_dim) = other.clusters_centers_ (i_cluster, i_dim);
   }
-  return (*this);
+  return *this;
 }
 
 //////////////////////////////////////////////////////////////////////////////////////////////
@@ -1185,7 +1185,7 @@ pcl::ism::ImplicitShapeModelEstimation<FeatureSize, PointT, NormalT>::alignYCoor
                           B,      A,   0.0f,
                        0.0f,   0.0f,   1.0f;
 
-  result = rotation_matrix_X * rotation_matrix_Z;
+  result.noalias() = rotation_matrix_X * rotation_matrix_Z;
 
   return (result);
 }
@@ -1204,12 +1204,8 @@ pcl::ism::ImplicitShapeModelEstimation<FeatureSize, PointT, NormalT>::estimateFe
   typename pcl::PointCloud<NormalT>::Ptr normal_cloud,
   typename pcl::PointCloud<pcl::Histogram<FeatureSize> >::Ptr feature_cloud)
 {
-  typename pcl::search::Search<PointT>::Ptr tree (new pcl::search::KdTree<PointT>);
-//  tree->setInputCloud (point_cloud);
-
   feature_estimator_->setInputCloud (sampled_point_cloud->makeShared ());
 //  feature_estimator_->setSearchSurface (point_cloud->makeShared ());
-  feature_estimator_->setSearchMethod (tree);
 
 //  typename pcl::SpinImageEstimation<pcl::PointXYZ, pcl::Normal, pcl::Histogram<FeatureSize> >::Ptr feat_est_norm =
 //    dynamic_pointer_cast<pcl::SpinImageEstimation<pcl::PointXYZ, pcl::Normal, pcl::Histogram<FeatureSize> > > (feature_estimator_);

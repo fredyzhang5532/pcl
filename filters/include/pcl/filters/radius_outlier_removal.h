@@ -40,7 +40,8 @@
 #pragma once
 
 #include <pcl/filters/filter_indices.h>
-#include <pcl/search/search.h> // for Search, Search<>::Ptr
+#include <pcl/search/search.h>           // for Search, Search<>::Ptr
+#include <pcl/point_types.h>             // for pcl::PointXYZ
 
 namespace pcl
 {
@@ -64,6 +65,7 @@ namespace pcl
     * indices_rem = rorfilter.getRemovedIndices ();
     * // The indices_rem array indexes all points of cloud_in that have 5 or more neighbors within the 0.1 search radius
     * \endcode
+    * \sa StatisticalOutlierRemoval
     * \author Radu Bogdan Rusu
     * \ingroup filters
     */
@@ -109,7 +111,7 @@ namespace pcl
         * \return The radius of the sphere for nearest neighbor searching.
         */
       inline double
-      getRadiusSearch ()
+      getRadiusSearch () const
       {
         return (search_radius_);
       }
@@ -131,7 +133,7 @@ namespace pcl
         * \return The minimum number of neighbors (default = 1).
         */
       inline int
-      getMinNeighborsInRadius ()
+      getMinNeighborsInRadius () const
       {
         return (min_pts_radius_);
       }
@@ -142,6 +144,24 @@ namespace pcl
         */
       inline void
       setSearchMethod (const SearcherPtr &searcher) { searcher_ = searcher; }
+
+      /** \brief Set the number of threads to use.
+       * \param nr_threads the number of hardware threads to use (0 sets the value back
+       * to automatic)
+       */
+      void
+      setNumberOfThreads(unsigned int nr_threads = 0)
+      {
+#ifdef _OPENMP
+        num_threads_ = nr_threads != 0 ? nr_threads : omp_get_num_procs();
+#else
+        if (num_threads_ != 1) {
+          PCL_WARN("OpenMP is not available. Keeping number of threads unchanged at 1\n");
+        }
+        num_threads_ = 1;
+#endif
+      }
+
     protected:
       using PCLBase<PointT>::input_;
       using PCLBase<PointT>::indices_;
@@ -177,6 +197,11 @@ namespace pcl
 
       /** \brief The minimum number of neighbors that a point needs to have in the given search radius to be considered an inlier. */
       int min_pts_radius_{1};
+
+      /**
+       * @brief Number of threads used during filtering
+       */
+      int num_threads_{1};
   };
 
   //////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -220,7 +245,7 @@ namespace pcl
 
       /** \brief Get the sphere radius used for determining the k-nearest neighbors. */
       inline double
-      getRadiusSearch ()
+      getRadiusSearch () const
       {
         return (search_radius_);
       }
@@ -239,7 +264,7 @@ namespace pcl
         * considered an inlier and avoid being filtered.
         */
       inline double
-      getMinNeighborsInRadius ()
+      getMinNeighborsInRadius () const
       {
         return (min_pts_radius_);
       }

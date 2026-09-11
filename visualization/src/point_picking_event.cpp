@@ -66,7 +66,7 @@ pcl::visualization::PointPickingCallback::Execute (vtkObject *caller, unsigned l
     if ((eventid == vtkCommand::LeftButtonPressEvent) && (iren->GetShiftKey () > 0))
     {
       float x = 0, y = 0, z = 0;
-      int idx = performSinglePick (iren, x, y, z);
+      const auto idx = performSinglePick (iren, x, y, z);
       // Create a PointPickingEvent if a point was selected
       if (idx != pcl::UNAVAILABLE)
       {
@@ -212,8 +212,11 @@ pcl::visualization::PointPickingCallback::performAreaPick (vtkRenderWindowIntera
 
     vtkPolyData* selected = glyph_filter->GetOutput ();
     vtkIdTypeArray* global_ids  = vtkIdTypeArray::SafeDownCast (selected->GetPointData ()->GetArray ("Indices"));
-
+#if (VTK_MAJOR_VERSION > 9 || (VTK_MAJOR_VERSION == 9 && VTK_MINOR_VERSION >= 7))
+    if (!global_ids->GetCapacity () || !selected->GetNumberOfPoints ())
+#else
     if (!global_ids->GetSize () || !selected->GetNumberOfPoints ())
+#endif
       continue;
 
     Indices actor_indices;

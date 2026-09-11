@@ -1,6 +1,6 @@
 set(SUBSYS_NAME benchmarks)
 set(SUBSYS_DESC "Point cloud library benchmarks")
-set(SUBSYS_DEPS common filters features search kdtree io)
+set(SUBSYS_DEPS common filters features search kdtree io sample_consensus)
 
 PCL_SUBSYS_OPTION(build "${SUBSYS_NAME}" "${SUBSYS_DESC}" OFF)
 PCL_SUBSYS_DEPEND(build NAME ${SUBSYS_NAME} DEPS ${SUBSYS_DEPS})
@@ -18,13 +18,24 @@ PCL_ADD_BENCHMARK(features_normal_3d FILES features/normal_3d.cpp
                   ARGUMENTS "${PCL_SOURCE_DIR}/test/table_scene_mug_stereo_textured.pcd"
                             "${PCL_SOURCE_DIR}/test/milk_cartoon_all_small_clorox.pcd")
 
+PCL_ADD_BENCHMARK(features_shot FILES features/shot.cpp
+                  LINK_WITH pcl_io pcl_search pcl_features
+                  ARGUMENTS "${PCL_SOURCE_DIR}/test/milk_cartoon_all_small_clorox.pcd")
+
 PCL_ADD_BENCHMARK(filters_voxel_grid FILES filters/voxel_grid.cpp
                   LINK_WITH pcl_io pcl_filters
                   ARGUMENTS "${PCL_SOURCE_DIR}/test/table_scene_mug_stereo_textured.pcd"
                             "${PCL_SOURCE_DIR}/test/milk_cartoon_all_small_clorox.pcd")
 
-PCL_ADD_BENCHMARK(search_radius_search FILES search/radius_search.cpp
-                  LINK_WITH pcl_io pcl_search
+PCL_ADD_BENCHMARK(filters_radius_outlier_removal FILES filters/radius_outlier_removal.cpp
+                  LINK_WITH pcl_io pcl_filters
                   ARGUMENTS "${PCL_SOURCE_DIR}/test/table_scene_mug_stereo_textured.pcd"
                             "${PCL_SOURCE_DIR}/test/milk_cartoon_all_small_clorox.pcd")
 
+PCL_ADD_BENCHMARK(sample_consensus_sac_model_cylinder FILES sample_consensus/sac_model_cylinder.cpp
+                  LINK_WITH pcl_io pcl_search pcl_filters pcl_sample_consensus pcl_segmentation
+                  ARGUMENTS "${PCL_SOURCE_DIR}/test/table_scene_mug_stereo_textured.pcd")
+
+PCL_ADD_BENCHMARK(search_radius_search FILES search/radius_search.cpp
+                  LINK_WITH pcl_io pcl_search pcl_filters
+                  ARGUMENTS "${PCL_SOURCE_DIR}/test/table_scene_mug_stereo_textured.pcd")

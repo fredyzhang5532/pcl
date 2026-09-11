@@ -66,12 +66,15 @@ mark_as_advanced(PCL_ONLY_CORE_POINT_TYPES)
 option(PCL_NO_PRECOMPILE "Do not precompile PCL code for any point types at all." OFF)
 mark_as_advanced(PCL_NO_PRECOMPILE)
 
-# Enable or Disable the check for SSE optimizations
+# Enable or Disable the check for SSE and AVX optimizations
+if(CMAKE_SYSTEM_PROCESSOR MATCHES "arm")
+option(PCL_ENABLE_SSE "Enable or Disable SSE optimizations." OFF)
+option(PCL_ENABLE_AVX "Enable or Disable AVX optimizations." OFF)
+else()
 option(PCL_ENABLE_SSE "Enable or Disable SSE optimizations." ON)
-mark_as_advanced(PCL_ENABLE_SSE)
-
-# Enable or Disable the check for AVX optimizations
 option(PCL_ENABLE_AVX "Enable or Disable AVX optimizations." ON)
+endif()
+mark_as_advanced(PCL_ENABLE_SSE)
 mark_as_advanced(PCL_ENABLE_AVX)
 
 if(UNIX)
@@ -122,3 +125,11 @@ option(PCL_DISABLE_GPU_TESTS "Disable running GPU tests. If disabled, tests will
 # Set whether visualizations tests should be run
 # (Used to prevent visualizations tests from executing in CI where visualization is unavailable)
 option(PCL_DISABLE_VISUALIZATION_TESTS "Disable running visualizations tests. If disabled, tests will still be built." OFF)
+
+# This leads to smaller libraries, possibly faster code, and fixes some bugs. See https://gcc.gnu.org/wiki/Visibility
+option(PCL_SYMBOL_VISIBILITY_HIDDEN "Hide all binary symbols by default, export only those explicitly marked (gcc and clang only). Experimental!" OFF)
+mark_as_advanced(PCL_SYMBOL_VISIBILITY_HIDDEN)
+if(PCL_SYMBOL_VISIBILITY_HIDDEN)
+  set(CMAKE_CXX_VISIBILITY_PRESET hidden)
+  set(CMAKE_VISIBILITY_INLINES_HIDDEN ON)
+endif()

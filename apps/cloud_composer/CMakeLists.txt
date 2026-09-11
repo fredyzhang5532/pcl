@@ -5,7 +5,7 @@
 
 set(SUBSUBSYS_NAME cloud_composer)
 set(SUBSUBSYS_DESC "Cloud Composer - Application for Manipulating Point Clouds")
-set(SUBSUBSYS_DEPS common io visualization filters apps)
+set(SUBSUBSYS_DEPS common io visualization features filters apps)
 set(SUBSUBSYS_EXT_DEPS vtk ${QTX})
 set(REASON "")
 set(DEFAULT OFF)
@@ -69,9 +69,11 @@ set(PCL_LIB_TYPE_ORIGIN ${PCL_LIB_TYPE})
 set(PCL_LIB_TYPE STATIC)
 
 PCL_ADD_LIBRARY(pcl_cc_tool_interface COMPONENT ${SUBSUBSYS_NAME} SOURCES ${INTERFACE_HEADERS} ${INTERFACE_SOURCES})
+if(PCL_SHARED_LIBS)
+  set_target_properties(pcl_cc_tool_interface PROPERTIES POSITION_INDEPENDENT_CODE TRUE)
+endif()
 
-
-target_link_libraries(pcl_cc_tool_interface pcl_common pcl_filters pcl_search pcl_visualization ${QTX}::Widgets)
+target_link_libraries(pcl_cc_tool_interface pcl_common pcl_features pcl_filters pcl_search pcl_visualization ${QTX}::Widgets)
 
 set(PCL_LIB_TYPE ${PCL_LIB_TYPE_ORIGIN})
 

@@ -42,6 +42,7 @@
 
 #include <pcl/io/pcd_io.h>
 #include <pcl/keypoints/sift_keypoint.h>
+#include <pcl/point_types.h>
 
 /* This examples shows how to estimate the SIFT points based on the 
  * z gradient of the 3D points than using the Intensity gradient as
@@ -83,8 +84,6 @@ main(int, char** argv)
   // Estimate the sift interest points using z values from xyz as the Intensity variants
   pcl::SIFTKeypoint<pcl::PointXYZ, pcl::PointWithScale> sift;
   pcl::PointCloud<pcl::PointWithScale> result;
-  pcl::search::KdTree<pcl::PointXYZ>::Ptr tree(new pcl::search::KdTree<pcl::PointXYZ> ());
-  sift.setSearchMethod(tree);
   sift.setScales(min_scale, n_octaves, n_scales_per_octave);
   sift.setMinimumContrast(min_contrast);
   sift.setInputCloud(cloud_xyz);

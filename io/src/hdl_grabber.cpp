@@ -287,7 +287,7 @@ pcl::HDLGrabber::loadHDL32Corrections ()
 boost::asio::ip::address
 pcl::HDLGrabber::getDefaultNetworkAddress ()
 {
-  return (boost::asio::ip::address::from_string ("192.168.3.255"));
+  return (boost::asio::ip::make_address ("192.168.3.255"));
 }
 
 /////////////////////////////////////////////////////////////////////////////
@@ -631,14 +631,14 @@ pcl::HDLGrabber::setMinimumDistanceThreshold (float &minThreshold)
 
 /////////////////////////////////////////////////////////////////////////////
 float
-pcl::HDLGrabber::getMaximumDistanceThreshold ()
+pcl::HDLGrabber::getMaximumDistanceThreshold () const
 {
   return (max_distance_threshold_);
 }
 
 /////////////////////////////////////////////////////////////////////////////
 float
-pcl::HDLGrabber::getMinimumDistanceThreshold ()
+pcl::HDLGrabber::getMinimumDistanceThreshold () const
 {
   return (min_distance_threshold_);
 }

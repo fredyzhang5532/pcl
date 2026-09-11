@@ -42,6 +42,7 @@
 #include <pcl/memory.h>
 #include <pcl/pcl_macros.h>
 #include <pcl/point_cloud.h>
+#include <pcl/common/point_tests.h> // for pcl::isFinite
 #include <pcl/search/search.h>
 #include <pcl/common/eigen.h>
 
@@ -138,12 +139,18 @@ namespace pcl
           {
             mask_.assign (input_->size (), 0);
             for (const auto& idx : *indices_)
-              mask_[idx] = 1;
+              if (pcl::isFinite((*input_)[idx]))
+                mask_[idx] = 1;
           }
           else
-            mask_.assign (input_->size (), 1);
+          {
+            mask_.assign (input_->size (), 0);
+            for (std::size_t idx=0; idx<input_->size(); ++idx)
+              if (pcl::isFinite((*input_)[idx]))
+                mask_[idx] = 1;
+          }
 
-          return estimateProjectionMatrix () && isValid ();
+          return (eps_ < 0 || estimateProjectionMatrix ()) && testProjectionMatrix() && isValid ();
         }
 
         /** \brief Search for all neighbors of query point that are within a given radius.
@@ -163,9 +170,32 @@ namespace pcl
                       std::vector<float> &k_sqr_distances,
                       unsigned int max_nn = 0) const override;
 
-        /** \brief estimated the projection matrix from the input cloud. */
+        /** \brief Estimate the projection matrix from the input cloud.
+          * \return True if it was possible to estimate the matrix, false otherwise
+          */
         bool
         estimateProjectionMatrix ();
+
+        /** \brief Quick test if projection matrix and input cloud work together.
+          */
+        bool
+        testProjectionMatrix () const;
+
+        /** \brief Set projection matrix manually. Projection matrix will _not_ be estimated automatically any more. If you want to use this, call it _before_ setInputCloud.
+          */
+        void
+        setProjectionMatrix (const Eigen::Matrix<float, 3, 4>& projection_matrix)
+        {
+          eps_ = -1.0f; // signal to not call estimateProjectionMatrix
+          projection_matrix_ = projection_matrix;
+          // rest is the same as in estimateProjectionMatrix():
+          // get left 3x3 sub matrix, which contains K * R, with K = camera matrix = [[fx s cx] [0 fy cy] [0 0 1]]
+          // and R being the rotation matrix
+          KR_ = projection_matrix_.topLeftCorner <3, 3> ();
+
+          // precalculate KR * KR^T needed by calculations during nn-search
+          KR_KRT_ = KR_ * KR_.transpose ();
+        }
 
          /** \brief Search for the k-nearest neighbors for a given query point.
            * \note limiting the maximum search radius (with setMaxDistance) can lead to a significant improvement in search speed
@@ -216,7 +246,7 @@ namespace pcl
         testPoint (const PointT& query, unsigned k, std::vector<Entry>& queue, index_t index) const
         {
           const PointT& point = input_->points [index];
-          if (mask_ [index] && std::isfinite (point.x))
+          if (mask_ [index])
           {
             //float squared_distance = (point.getVector3fMap () - query.getVector3fMap ()).squaredNorm ();
             float dist_x = point.x - query.x;
@@ -273,12 +303,12 @@ namespace pcl
         Eigen::Matrix<float, 3, 3, Eigen::RowMajor> KR_KRT_;
 
         /** \brief epsilon value for the MSE of the projection matrix estimation*/
-        const float eps_;
+        float eps_;
 
         /** \brief using only a subsample of points to calculate the projection matrix. pyramid_level_ = use down sampled cloud given by pyramid_level_*/
         const unsigned pyramid_level_;
         
-        /** \brief mask, indicating whether the point was in the indices list or not.*/
+        /** \brief mask, indicating whether the point was in the indices list or not, and whether it is finite.*/
         std::vector<unsigned char> mask_;
       public:
         PCL_MAKE_ALIGNED_OPERATOR_NEW

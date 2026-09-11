@@ -11,12 +11,10 @@
 
 #include <limits>
 
-#include <unsupported/Eigen/NonLinearOptimization> // for LevenbergMarquardt
 #include <pcl/sample_consensus/sac_model_ellipse3d.h>
 #include <pcl/common/concatenate.h>
 
 #include <Eigen/Eigenvalues>
-#include <complex>
 
 
 //////////////////////////////////////////////////////////////////////////
@@ -163,22 +161,23 @@ pcl::SampleConsensusModelEllipse3D<PointT>::computeModelCoefficients (const Indi
   const float con_F(neigvec(5));
 
   // Build matrix M0
-  const Eigen::MatrixXf M0 = (Eigen::MatrixXf(3, 3)
+  const Eigen::Matrix3f M0 = (Eigen::Matrix3f()
     << con_F, con_D/2.0, con_E/2.0,
       con_D/2.0, con_A, con_B/2.0,
       con_E/2.0, con_B/2.0, con_C)
     .finished();
 
   // Build matrix M
-  const Eigen::MatrixXf M = (Eigen::MatrixXf(2, 2)
+  const Eigen::Matrix2f M = (Eigen::Matrix2f()
     << con_A, con_B/2.0,
       con_B/2.0, con_C)
     .finished();
 
   // Calculate the eigenvalues and eigenvectors of matrix M
-  Eigen::EigenSolver<Eigen::MatrixXf> solver_M(M);
+  Eigen::SelfAdjointEigenSolver<Eigen::Matrix2f> solver_M;
+  solver_M.computeDirect(M, Eigen::EigenvaluesOnly);
 
-  Eigen::VectorXf eigvals_M = solver_M.eigenvalues().real();
+  Eigen::Vector2f eigvals_M = solver_M.eigenvalues();
 
   // Order the eigenvalues so that |lambda_0 - con_A| <= |lambda_0 - con_C|
   float aux_eigval(0.0);
@@ -200,12 +199,12 @@ pcl::SampleConsensusModelEllipse3D<PointT>::computeModelCoefficients (const Indi
   Eigen::Vector3f p_ctr;
   float aux_par(0.0);
   if (par_a > par_b) {
-    p_ctr = p0 + Rot * Eigen::Vector3f(par_h, par_k, 0.0);
+    p_ctr.noalias() = p0 + Rot * Eigen::Vector3f(par_h, par_k, 0.0);
   } else {
     aux_par = par_a;
     par_a = par_b;
     par_b = aux_par;
-    p_ctr = p0 + Rot * Eigen::Vector3f(par_k, par_h, 0.0);
+    p_ctr.noalias() = p0 + Rot * Eigen::Vector3f(par_k, par_h, 0.0);
   }
 
   // Center (x, y, z)
@@ -226,7 +225,7 @@ pcl::SampleConsensusModelEllipse3D<PointT>::computeModelCoefficients (const Indi
   // Retrieve the ellipse point at the tilt angle t (par_t), along the local x-axis
   const Eigen::VectorXf params = (Eigen::VectorXf(5) << par_a, par_b, par_h, par_k, par_t).finished();
   Eigen::Vector3f p_th_(0.0, 0.0, 0.0);
-  get_ellipse_point(params, par_t, p_th_(0), p_th_(1));
+  internal::get_ellipse_point(params, par_t, p_th_(0), p_th_(1));
 
   // Redefinition of the x-axis of the ellipse's local reference frame
   x_axis = (Rot * p_th_).normalized();
@@ -281,16 +280,18 @@ pcl::SampleConsensusModelEllipse3D<PointT>::getDistancesToModel (const Eigen::Ve
   float th_opt;
 
   // Iterate through the 3D points and calculate the distances from them to the ellipse
-  for (std::size_t i = 0; i < indices_->size (); ++i)
-  // Calculate the distance from the point to the ellipse:
-  // 1.   calculate intersection point of the plane in which the ellipse lies and the
-  //      line from the sample point with the direction of the plane normal (projected point)
-  // 2.   calculate the intersection point of the line from the ellipse center to the projected point
-  //      with the ellipse
-  // 3.   calculate distance from corresponding point on the ellipse to the sample point
+  std::size_t i = 0;
+  for (const auto& index : *indices_)
   {
+    // Calculate the distance from the point to the ellipse:
+    // 1.   calculate intersection point of the plane in which the ellipse lies and the
+    //      line from the sample point with the direction of the plane normal (projected point)
+    // 2.   calculate the intersection point of the line from the ellipse center to the projected point
+    //      with the ellipse
+    // 3.   calculate distance from corresponding point on the ellipse to the sample point
+
     // p : Sample Point
-    const Eigen::Vector3f p((*input_)[(*indices_)[i]].x, (*input_)[(*indices_)[i]].y, (*input_)[(*indices_)[i]].z);
+    const Eigen::Vector3f p((*input_)[index].x, (*input_)[index].y, (*input_)[index].z);
     
     // Local coordinates of sample point p
     const Eigen::Vector3f p_ = Rot_T * (p - c);
@@ -299,9 +300,9 @@ pcl::SampleConsensusModelEllipse3D<PointT>::getDistancesToModel (const Eigen::Ve
     // Calculate the shortest distance from the point to the ellipse which is given by
     // the norm of a vector that is normal to the ellipse tangent calculated at the
     // point it intersects the tangent.
-    const Eigen::Vector2f distanceVector = dvec2ellipse(params, p_(0), p_(1), th_opt);
+    const Eigen::Vector2f distanceVector = internal::dvec2ellipse(params, p_(0), p_(1), th_opt);
 
-    distances[i] = distanceVector.norm();
+    distances[i++] = distanceVector.norm();
   }
 }
 
@@ -344,10 +345,10 @@ pcl::SampleConsensusModelEllipse3D<PointT>::selectWithinDistance (
 
   const auto squared_threshold = threshold * threshold;
   // Iterate through the 3d points and calculate the distances from them to the ellipse
-  for (std::size_t i = 0; i < indices_->size (); ++i)
+  for (const auto& index : *indices_)
   {
     // p : Sample Point
-    const Eigen::Vector3f p((*input_)[(*indices_)[i]].x, (*input_)[(*indices_)[i]].y, (*input_)[(*indices_)[i]].z);
+    const Eigen::Vector3f p((*input_)[index].x, (*input_)[index].y, (*input_)[index].z);
 
     // Local coordinates of sample point p
     const Eigen::Vector3f p_ = Rot_T * (p - c);
@@ -358,13 +359,13 @@ pcl::SampleConsensusModelEllipse3D<PointT>::selectWithinDistance (
     // point it intersects the tangent.
     const Eigen::VectorXf params = (Eigen::VectorXf(5) << par_a, par_b, 0.0, 0.0, 0.0).finished();
     float th_opt;
-    const Eigen::Vector2f distanceVector = dvec2ellipse(params, p_(0), p_(1), th_opt);
+    const Eigen::Vector2f distanceVector = internal::dvec2ellipse(params, p_(0), p_(1), th_opt);
 
     const double sqr_dist = distanceVector.squaredNorm();
     if (sqr_dist < squared_threshold)
     {
       // Returns the indices of the points whose distances are smaller than the threshold
-      inliers.push_back ((*indices_)[i]);
+      inliers.push_back (index);
       error_sqr_dists_.push_back (sqr_dist);
     }
   }
@@ -403,10 +404,10 @@ pcl::SampleConsensusModelEllipse3D<PointT>::countWithinDistance (
 
   const auto squared_threshold = threshold * threshold;
   // Iterate through the 3d points and calculate the distances from them to the ellipse
-  for (std::size_t i = 0; i < indices_->size (); ++i)
+  for (const auto& index : *indices_)
   {
     // p : Sample Point
-    const Eigen::Vector3f p((*input_)[(*indices_)[i]].x, (*input_)[(*indices_)[i]].y, (*input_)[(*indices_)[i]].z);
+    const Eigen::Vector3f p((*input_)[index].x, (*input_)[index].y, (*input_)[index].z);
 
     // Local coordinates of sample point p
     const Eigen::Vector3f p_ = Rot_T * (p - c);
@@ -417,7 +418,7 @@ pcl::SampleConsensusModelEllipse3D<PointT>::countWithinDistance (
     // point it intersects the tangent.
     const Eigen::VectorXf params = (Eigen::VectorXf(5) << par_a, par_b, 0.0, 0.0, 0.0).finished();
     float th_opt;
-    const Eigen::Vector2f distanceVector = dvec2ellipse(params, p_(0), p_(1), th_opt);
+    const Eigen::Vector2f distanceVector = internal::dvec2ellipse(params, p_(0), p_(1), th_opt);
 
     if (distanceVector.squaredNorm() < squared_threshold)
       nr_p++;
@@ -444,52 +445,29 @@ pcl::SampleConsensusModelEllipse3D<PointT>::optimizeModelCoefficients (
   // Need more than the minimum sample size to make a difference
   if (inliers.size () <= sample_size_)
   {
-    PCL_ERROR ("[pcl::SampleConsensusModelEllipse3D::optimizeModelCoefficients] Not enough inliers to refine/optimize the model's coefficients (%lu)! Returning the same coefficients.\n", inliers.size ());
+    PCL_ERROR ("[pcl::SampleConsensusModelEllipse3D::optimizeModelCoefficients] Not enough inliers found to optimize model coefficients (%lu)! Returning the same coefficients.\n", inliers.size ());
     return;
   }
 
-  OptimizationFunctor functor(this, inliers);
-  Eigen::NumericalDiff<OptimizationFunctor> num_diff(functor);
-  Eigen::LevenbergMarquardt<Eigen::NumericalDiff<OptimizationFunctor>, double> lm(num_diff);
-  Eigen::VectorXd coeff;
-  int info = lm.minimize(coeff);
-  for (Eigen::Index i = 0; i < coeff.size (); ++i)
-    optimized_coefficients[i] = static_cast<float> (coeff[i]);
+  Eigen::ArrayXf x (inliers.size ()), y (inliers.size ()), z (inliers.size ());
+  std::size_t i = 0;
+  for (const auto& inlier : inliers)
+  {
+    const auto& pt = (*input_)[inlier];
+    x[i] = pt.x; y[i] = pt.y; z[i] = pt.z;
+    ++i;
+  }
 
-  // Compute the L2 norm of the residuals
-  PCL_DEBUG ("[pcl::SampleConsensusModelEllipse3D::optimizeModelCoefficients] LM solver finished with exit code %i, having a residual norm of %g. \nInitial solution: %g %g %g %g %g %g %g %g %g %g %g\nFinal solution: %g %g %g %g %g %g %g %g %g %g %g\n",
-            info, lm.fvec.norm (),
-
-            model_coefficients[0],
-            model_coefficients[1],
-            model_coefficients[2],
-            model_coefficients[3],
-            model_coefficients[4],
-            model_coefficients[5],
-            model_coefficients[6],
-            model_coefficients[7],
-            model_coefficients[8],
-            model_coefficients[9],
-            model_coefficients[10],
-
-            optimized_coefficients[0],
-            optimized_coefficients[1],
-            optimized_coefficients[2],
-            optimized_coefficients[3],
-            optimized_coefficients[4],
-            optimized_coefficients[5],
-            optimized_coefficients[6],
-            optimized_coefficients[7],
-            optimized_coefficients[8],
-            optimized_coefficients[9],
-            optimized_coefficients[10]);
+  internal::optimizeModelCoefficientsEllipse3D (optimized_coefficients, x, y, z);
 }
 
 //////////////////////////////////////////////////////////////////////////
 template <typename PointT> void
 pcl::SampleConsensusModelEllipse3D<PointT>::projectPoints (
-      const Indices &inliers, const Eigen::VectorXf &model_coefficients,
-      PointCloud &projected_points, bool copy_data_fields) const
+      const Indices &inliers,
+      const Eigen::VectorXf &model_coefficients,
+      PointCloud &projected_points,
+      bool copy_data_fields) const
 {
   // Needs a valid set of model coefficients
   if (!isModelValid (model_coefficients))
@@ -539,10 +517,10 @@ pcl::SampleConsensusModelEllipse3D<PointT>::projectPoints (
     const Eigen::Matrix3f Rot_T = Rot.transpose();
 
     // Iterate through the 3d points and calculate the distances from them to the plane
-    for (std::size_t i = 0; i < inliers.size (); ++i)
+    for (const auto& inlier : inliers)
     {
       // p : Sample Point
-      const Eigen::Vector3f p((*input_)[(*indices_)[i]].x, (*input_)[(*indices_)[i]].y, (*input_)[(*indices_)[i]].z);
+      const Eigen::Vector3f p((*input_)[inlier].x, (*input_)[inlier].y, (*input_)[inlier].z);
 
       // Local coordinates of sample point p
       const Eigen::Vector3f p_ = Rot_T * (p - c);
@@ -553,17 +531,17 @@ pcl::SampleConsensusModelEllipse3D<PointT>::projectPoints (
       // point it intersects the tangent.
       const Eigen::VectorXf params = (Eigen::VectorXf(5) << par_a, par_b, 0.0, 0.0, 0.0).finished();
       float th_opt;
-      dvec2ellipse(params, p_(0), p_(1), th_opt);
+      internal::dvec2ellipse(params, p_(0), p_(1), th_opt);
 
       // Retrieve the ellipse point at the tilt angle t, along the local x-axis
       Eigen::Vector3f k_(0.0, 0.0, 0.0);
-      get_ellipse_point(params, th_opt, k_[0], k_[1]);
+      internal::get_ellipse_point(params, th_opt, k_[0], k_[1]);
 
       const Eigen::Vector3f k = c + Rot * k_;
 
-      projected_points[i].x = static_cast<float> (k[0]);
-      projected_points[i].y = static_cast<float> (k[1]);
-      projected_points[i].z = static_cast<float> (k[2]);
+      projected_points[inlier].x = static_cast<float> (k[0]);
+      projected_points[inlier].y = static_cast<float> (k[1]);
+      projected_points[inlier].z = static_cast<float> (k[2]);
     }
   }
   else
@@ -601,10 +579,11 @@ pcl::SampleConsensusModelEllipse3D<PointT>::projectPoints (
     const Eigen::Matrix3f Rot_T = Rot.transpose();
 
     // Iterate through the 3d points and calculate the distances from them to the plane
-    for (std::size_t i = 0; i < inliers.size (); ++i)
+    std::size_t i = 0;
+    for (const auto& inlier : inliers)
     {
       // p : Sample Point
-      const Eigen::Vector3f p((*input_)[(*indices_)[i]].x, (*input_)[(*indices_)[i]].y, (*input_)[(*indices_)[i]].z);
+      const Eigen::Vector3f p((*input_)[inlier].x, (*input_)[inlier].y, (*input_)[inlier].z);
 
       // Local coordinates of sample point p
       const Eigen::Vector3f p_ = Rot_T * (p - c);
@@ -615,18 +594,17 @@ pcl::SampleConsensusModelEllipse3D<PointT>::projectPoints (
       // point it intersects the tangent.
       const Eigen::VectorXf params = (Eigen::VectorXf(5) << par_a, par_b, 0.0, 0.0, 0.0).finished();
       float th_opt;
-      dvec2ellipse(params, p_(0), p_(1), th_opt);
+      internal::dvec2ellipse(params, p_(0), p_(1), th_opt);
 
       // Retrieve the ellipse point at the tilt angle t, along the local x-axis
-      //// model_coefficients[5] = static_cast<float>(par_t);
       Eigen::Vector3f k_(0.0, 0.0, 0.0);
-      get_ellipse_point(params, th_opt, k_[0], k_[1]);
+      internal::get_ellipse_point(params, th_opt, k_[0], k_[1]);
 
       const Eigen::Vector3f k = c + Rot * k_;
 
       projected_points[i].x = static_cast<float> (k[0]);
       projected_points[i].y = static_cast<float> (k[1]);
-      projected_points[i].z = static_cast<float> (k[2]);
+      projected_points[i++].z = static_cast<float> (k[2]);
     }
   }
 }
@@ -681,7 +659,7 @@ pcl::SampleConsensusModelEllipse3D<PointT>::doSamplesVerifyModel (
     // point it intersects the tangent.
     const Eigen::VectorXf params = (Eigen::VectorXf(5) << par_a, par_b, 0.0, 0.0, 0.0).finished();
     float th_opt;
-    const Eigen::Vector2f distanceVector = dvec2ellipse(params, p_(0), p_(1), th_opt);
+    const Eigen::Vector2f distanceVector = internal::dvec2ellipse(params, p_(0), p_(1), th_opt);
 
     if (distanceVector.squaredNorm() > squared_threshold)
       return (false);
@@ -711,153 +689,5 @@ pcl::SampleConsensusModelEllipse3D<PointT>::isModelValid (const Eigen::VectorXf 
 
   return (true);
 }
-
-
-
-//////////////////////////////////////////////////////////////////////////
-template <typename PointT>
-void inline pcl::SampleConsensusModelEllipse3D<PointT>::get_ellipse_point(
-    const Eigen::VectorXf& par, float th, float& x, float& y)
-{
-  /*
-   * Calculates a point on the ellipse model 'par' using the angle 'th'.
-   */
-
-  // Parametric eq.params
-  const float par_a(par[0]);
-  const float par_b(par[1]);
-  const float par_h(par[2]);
-  const float par_k(par[3]);
-  const float par_t(par[4]);
-
-  x = par_h + std::cos(par_t) * par_a * std::cos(th) -
-      std::sin(par_t) * par_b * std::sin(th);
-  y = par_k + std::sin(par_t) * par_a * std::cos(th) +
-      std::cos(par_t) * par_b * std::sin(th);
-
-  return;
-}
-
-//////////////////////////////////////////////////////////////////////////
-template <typename PointT>
-Eigen::Vector2f inline pcl::SampleConsensusModelEllipse3D<PointT>::dvec2ellipse(
-    const Eigen::VectorXf& par, float u, float v, float& th_opt)
-{
-  /*
-   * Minimum distance vector from point p=(u,v) to the ellipse model 'par'.
-   */
-
-  // Parametric eq.params
-  // (par_a, par_b, and par_t do not need to be declared)
-  const float par_h = par[2];
-  const float par_k = par[3];
-
-  const Eigen::Vector2f center(par_h, par_k);
-  Eigen::Vector2f p(u, v);
-  p -= center;
-
-  // Local x-axis of the ellipse
-  Eigen::Vector2f x_axis(0.0, 0.0);
-  get_ellipse_point(par, 0.0, x_axis(0), x_axis(1));
-  x_axis -= center;
-
-  // Local y-axis of the ellipse
-  Eigen::Vector2f y_axis(0.0, 0.0);
-  get_ellipse_point(par, M_PI / 2.0, y_axis(0), y_axis(1));
-  y_axis -= center;
-
-  // Convert the point p=(u,v) to local ellipse coordinates
-  const float x_proj = p.dot(x_axis) / x_axis.norm();
-  const float y_proj = p.dot(y_axis) / y_axis.norm();
-
-  // Find the ellipse quandrant to where the point p=(u,v) belongs,
-  // and limit the search interval to 'th_min' and 'th_max'.
-  float th_min(0.0), th_max(0.0);
-  const float th = std::atan2(y_proj, x_proj);
-
-  if (-M_PI <= th && th < -M_PI / 2.0) {
-    // Q3
-    th_min = -M_PI;
-    th_max = -M_PI / 2.0;
-  }
-  if (-M_PI / 2.0 <= th && th < 0.0) {
-    // Q4
-    th_min = -M_PI / 2.0;
-    th_max = 0.0;
-  }
-  if (0.0 <= th && th < M_PI / 2.0) {
-    // Q1
-    th_min = 0.0;
-    th_max = M_PI / 2.0;
-  }
-  if (M_PI / 2.0 <= th && th <= M_PI) {
-    // Q2
-    th_min = M_PI / 2.0;
-    th_max = M_PI;
-  }
-
-  // Use an unconstrained line search optimizer to find the optimal th_opt
-  th_opt = golden_section_search(par, u, v, th_min, th_max, 1.e-3);
-
-  // Distance vector from a point (u,v) to a given point in the ellipse model 'par' at an angle 'th_opt'.
-  float x(0.0), y(0.0);
-  get_ellipse_point(par, th_opt, x, y);
-  Eigen::Vector2f distanceVector(u - x, v - y);
-  return distanceVector;
-}
-
-//////////////////////////////////////////////////////////////////////////
-template <typename PointT>
-float inline pcl::SampleConsensusModelEllipse3D<PointT>::golden_section_search(
-    const Eigen::VectorXf& par,
-    float u,
-    float v,
-    float th_min,
-    float th_max,
-    float epsilon)
-{
-  /*
-   * Golden section search
-   */
-
-  constexpr float phi(1.61803398874989484820f); // Golden ratio
-
-  // tl (theta lower bound), tu (theta upper bound)
-  float tl(th_min), tu(th_max);
-  float ta = tl + (tu - tl) * (1 - 1 / phi);
-  float tb = tl + (tu - tl) * 1 / phi;
-
-  while ((tu - tl) > epsilon) {
-
-    // theta a
-    float x_a(0.0), y_a(0.0);
-    get_ellipse_point(par, ta, x_a, y_a);
-    float squared_dist_ta = (u - x_a) * (u - x_a) + (v - y_a) * (v - y_a);
-
-    // theta b
-    float x_b(0.0), y_b(0.0);
-    get_ellipse_point(par, tb, x_b, y_b);
-    float squared_dist_tb = (u - x_b) * (u - x_b) + (v - y_b) * (v - y_b);
-
-    if (squared_dist_ta < squared_dist_tb) {
-      tu = tb;
-      tb = ta;
-      ta = tl + (tu - tl) * (1 - 1 / phi);
-    }
-    else if (squared_dist_ta > squared_dist_tb) {
-      tl = ta;
-      ta = tb;
-      tb = tl + (tu - tl) * 1 / phi;
-    }
-    else {
-      tl = ta;
-      tu = tb;
-      ta = tl + (tu - tl) * (1 - 1 / phi);
-      tb = tl + (tu - tl) * 1 / phi;
-    }
-  }
-  return (tl + tu) / 2.0;
-}
-
 
 #define PCL_INSTANTIATE_SampleConsensusModelEllipse3D(T) template class PCL_EXPORTS pcl::SampleConsensusModelEllipse3D<T>;

@@ -1,6 +1,7 @@
 set(SUBSYS_NAME tests_features)
 set(SUBSYS_DESC "Point cloud library features module unit tests")
 PCL_SET_TEST_DEPENDENCIES(SUBSYS_DEPS features)
+list(APPEND SUBSYS_DEPS kdtree)
 set(OPT_DEPS io keypoints) # module does not depend on these
 
 PCL_SUBSYS_OPTION(build "${SUBSYS_NAME}" "${SUBSYS_DESC}" ON)
@@ -89,7 +90,7 @@ if(BUILD_io)
                ARGUMENTS "${PCL_SOURCE_DIR}/test/bun0.pcd")
   PCL_ADD_TEST(features_narf test_narf
                FILES test_narf.cpp
-               LINK_WITH pcl_gtest pcl_features FLANN::FLANN)
+               LINK_WITH pcl_gtest pcl_features)
   PCL_ADD_TEST(a_ii_normals_test test_ii_normals
                FILES test_ii_normals.cpp
                LINK_WITH pcl_gtest pcl_io pcl_features

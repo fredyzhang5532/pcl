@@ -43,6 +43,7 @@
 #include <pcl/memory.h>
 #include <pcl/pcl_macros.h>
 #include <pcl/features/feature.h>
+#include <pcl/point_types.h>       // for Histogram
 
 namespace pcl
 {
@@ -138,6 +139,7 @@ namespace pcl
       using Feature<PointInT, PointOutT>::search_radius_;
       using Feature<PointInT, PointOutT>::search_parameter_;
       using Feature<PointInT, PointOutT>::surface_;
+      using Feature<PointInT, PointOutT>::tree_;
       using FeatureFromNormals<PointInT, PointNT, PointOutT>::normals_;
 
       using PointCloudOut = typename Feature<PointInT, PointOutT>::PointCloudOut;

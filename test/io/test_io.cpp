@@ -48,6 +48,7 @@
 #include <pcl/io/ply_io.h>
 #include <pcl/io/ascii_io.h>
 #include <pcl/io/obj_io.h>
+#include <pcl/PolygonMesh.h>
 #include <fstream>
 #include <iomanip> // for setprecision
 #include <locale>
@@ -1144,6 +1145,109 @@ TEST(PCL, OBJRead)
   remove ("test_obj.mtl");
 }
 
+TEST(PCL, loadOBJWithoutFaces)
+{
+  std::ofstream fs;
+  fs.open ("test_obj.obj");
+  fs << "v -1.000000 -1.000000 1.000000\n"
+        "v -1.000000 1.000000 1.000000\n"
+        "v 1.000000 -1.000000 1.000000\n"
+        "v 1.000000 1.000000 1.000000\n"
+        "vn -1.0000 0.0000 0.0000\n"
+        "vn 0.0000 0.0000 -1.0000\n"
+        "vn 1.0000 0.0000 0.0000\n"
+        "vn 0.0000 1.0000 0.0000\n";
+
+  fs.close ();
+  pcl::PointCloud<pcl::PointNormal> point_cloud;
+  pcl::io::loadOBJFile("test_obj.obj", point_cloud);
+  EXPECT_EQ(point_cloud.size(), 4);
+  EXPECT_NEAR(point_cloud[0].normal_x, -1.0, 1e-5);
+  EXPECT_NEAR(point_cloud[1].normal_z, -1.0, 1e-5);
+  EXPECT_NEAR(point_cloud[2].normal_x, 1.0, 1e-5);
+  EXPECT_NEAR(point_cloud[3].normal_y, 1.0, 1e-5);
+  EXPECT_NEAR(point_cloud[1].normal_y, 0.0, 1e-5);
+  EXPECT_NEAR(point_cloud[3].normal_z, 0.0, 1e-5);
+  remove ("test_obj.obj");
+}
+
+TEST(PCL, OBJReadMalformedFaceIndices)
+{
+  const std::string fname = "test_obj_malformed.obj";
+
+  const std::string header =
+      "v 0.0 0.0 0.0\n"
+      "v 1.0 0.0 0.0\n"
+      "v 0.0 1.0 0.0\n"
+      "vn 0.0 0.0 1.0\n"
+      "vt 0.0 0.0\n"
+      "usemtl None\n";
+
+  const std::vector<std::string> bad_faces = {
+    "f 4//1 2//1 3//1\n",
+    "f 999999//1 2//1 3//1\n",
+    "f 1//999999 2//1 3//1\n",
+    "f 0//1 2//1 3//1\n",
+    "f -999//1 2//1 3//1\n",
+    "f abc//1 2//1 3//1\n",
+    "f 99999999999//1 2//1 3//1\n",
+  };
+
+  for (const auto &bad_face : bad_faces)
+  {
+    std::ofstream fs (fname);
+    fs << header << bad_face;
+    fs.close ();
+
+    pcl::OBJReader objreader;
+
+    pcl::PCLPointCloud2 blob;
+    EXPECT_EQ (objreader.read (fname, blob), -1) << "blob reader accepted: " << bad_face;
+
+    pcl::PolygonMesh poly_mesh;
+    EXPECT_EQ (objreader.read (fname, poly_mesh), -1) << "PolygonMesh reader accepted: " << bad_face;
+
+    pcl::TextureMesh tex_mesh;
+    EXPECT_EQ (objreader.read (fname, tex_mesh), -1) << "TextureMesh reader accepted: " << bad_face;
+  }
+
+  {
+    std::ofstream fs (fname);
+    fs << header << "f 1/999999/1 2/1/1 3/1/1\n";
+    fs.close ();
+
+    pcl::OBJReader objreader;
+    pcl::TextureMesh tex_mesh;
+    EXPECT_EQ (objreader.read (fname, tex_mesh), -1);
+  }
+
+  remove (fname.c_str ());
+}
+
+TEST(PCL, OBJReadValidRelativeIndices)
+{
+  const std::string fname = "test_obj_relative.obj";
+  std::ofstream fs (fname);
+  fs << "v 0.0 0.0 0.0\n"
+        "v 1.0 0.0 0.0\n"
+        "v 0.0 1.0 0.0\n"
+        "vn 0.0 0.0 1.0\n"
+        "f -3//-1 -2//-1 -1//-1\n";
+  fs.close ();
+
+  pcl::OBJReader objreader;
+
+  pcl::PCLPointCloud2 blob;
+  EXPECT_EQ (objreader.read (fname, blob), 0);
+  EXPECT_EQ (blob.width, 3);
+
+  pcl::PolygonMesh poly_mesh;
+  EXPECT_EQ (objreader.read (fname, poly_mesh), 0);
+  EXPECT_EQ (poly_mesh.polygons.size (), 1);
+
+  remove (fname.c_str ());
+}
+
 //////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 struct PointXYZFPFH33
@@ -1702,6 +1806,30 @@ TYPED_TEST (AutoIOTest, AutoLoadCloudFiles)
   remove ("test_autoio.pcd");
   remove ("test_autoio.ply");
   remove ("test_autoio.ifs");
+}
+
+TEST(PCL, IFS)
+{
+  // Write a cloud to an IFS file and check if it is the same after loading
+  pcl::PointCloud<pcl::PointXYZ>::Ptr cloud(new pcl::PointCloud<pcl::PointXYZ>);
+  cloud->push_back(pcl::PointXYZ(1.0, 2.0, 3.0));
+  cloud->push_back(pcl::PointXYZ(4.0, 5.0, 6.0));
+
+  pcl::io::saveIFSFile("test.ifs", *cloud);
+
+  pcl::PointCloud<pcl::PointXYZ>::Ptr loaded(new pcl::PointCloud<pcl::PointXYZ>);
+  pcl::io::loadIFSFile("test.ifs", *loaded);
+
+  EXPECT_EQ(cloud->size(), loaded->size());
+  for (size_t i = 0; i < cloud->size(); ++i)
+  {
+    const auto& src = cloud->points[i];
+    const auto& dst = loaded->points[i];
+    EXPECT_EQ(src.x, dst.x);
+    EXPECT_EQ(src.y, dst.y);
+    EXPECT_EQ(src.z, dst.z);
+  }
+  remove("test.ifs");
 }
 
 /* ---[ */
